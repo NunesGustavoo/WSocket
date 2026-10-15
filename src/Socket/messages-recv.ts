@@ -1611,6 +1611,11 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 	ws.on('CB:ack,class:message', (node: BinaryNode) => {
 		handleBadAck(node).catch(error => onUnexpectedError(error, 'handling bad ack'))
 	})
+	// <status> de topo (story de contato, rollout desde 2026-09): sem ack o servidor derruba a stream em ~50 min
+	// com Stream Errored (ack). Ack simples: NACK deixa o stanza pendente (WhiskeySockets/Baileys#2858)
+	ws.on('CB:status', (node: BinaryNode) => {
+		sendMessageAck(node).catch(error => onUnexpectedError(error, 'acking status stanza'))
+	})
 	ws.on('CB:presence', handlePresenceUpdate)
 	ws.on('CB:chatstate', handlePresenceUpdate)
 
