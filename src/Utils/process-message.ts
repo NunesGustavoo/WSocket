@@ -16,7 +16,7 @@ import { getContentType, normalizeMessageContent } from '../Utils/messages'
 import { areJidsSameUser, isJidBroadcast, isJidStatusBroadcast, jidDecode, jidNormalizedUser } from '../WABinary'
 import { aesDecryptGCM, hmacSign } from './crypto'
 import { toNumber } from './generics'
-import { downloadHistory, processHistoryMessage } from './history'
+import { downloadHistoryBuffer, processHistorySyncBuffer, ProcessedHistorySync } from './history'
 import { ILogger } from './logger'
 import { storeNctSaltFromHistorySync } from './cs-token-utils'
 import { storeTcTokensFromHistorySync } from './tc-token-utils'
@@ -145,7 +145,11 @@ export function decryptPollVote(
 	}
 }
 
-const forgetSenderKeyMemory = async (keyStore: SignalKeyStoreWithTransaction, groupJid: string, participants: string[]) => {
+const forgetSenderKeyMemory = async (
+	keyStore: SignalKeyStoreWithTransaction,
+	groupJid: string,
+	participants: string[]
+) => {
 	const users = new Set(participants.map(p => jidDecode(p)?.user).filter(Boolean))
 	const memory = (await keyStore.get('sender-key-memory', [groupJid]))[groupJid]
 	if (!users.size || !memory) {
@@ -205,7 +209,7 @@ const processMessage = async (
 	const protocolMsg = content?.protocolMessage
 	if (protocolMsg) {
 		switch (protocolMsg.type) {
-		case proto.Message.ProtocolMessage.Type.HISTORY_SYNC_NOTIFICATION:
+			case proto.Message.ProtocolMessage.Type.HISTORY_SYNC_NOTIFICATION:
 				const histNotification = protocolMsg.historySyncNotification!
 				const process = shouldProcessHistoryMsg
 				const isLatest = !creds.processedHistoryMessages?.length
@@ -236,12 +240,12 @@ const processMessage = async (
 							]
 						})
 					}
-
 				}
 
-				let historySync: proto.HistorySync
+				let syncResult: ProcessedHistorySync
 				try {
-					historySync = await downloadHistory(histNotification, options)
+					const buffer = await downloadHistoryBuffer(histNotification, options)
+					syncResult = processHistorySyncBuffer(buffer)
 				} catch (err) {
 					if (process) throw err
 					logger?.warn(
@@ -257,18 +261,27 @@ const processMessage = async (
 					break
 				}
 
-				try {
-					await storeNctSaltFromHistorySync(historySync, keyStore, logger)
-				} catch (err) {
-					logger?.warn({ err }, 'falha ao persistir nct salt do history sync')
+				if (syncResult.nctSalt) {
+					try {
+						await storeNctSaltFromHistorySync(
+							{ nctSalt: syncResult.nctSalt, syncType: syncResult.syncType },
+							keyStore,
+							logger
+						)
+					} catch (err) {
+						logger?.warn({ err }, 'falha ao persistir nct salt do history sync')
+					}
 				}
 
-				await storeTcTokensFromHistorySync((historySync.conversations || []) as Chat[], keyStore, logger)
+				await storeTcTokensFromHistorySync(syncResult.conversations, keyStore, logger)
 
 				if (process) {
-					const data = processHistoryMessage(historySync)
 					ev.emit('messaging-history.set', {
-						...data,
+						chats: syncResult.chats,
+						contacts: syncResult.contacts,
+						messages: syncResult.messages,
+						syncType: syncResult.syncType,
+						progress: syncResult.progress,
 						isLatest: histNotification.syncType !== proto.HistorySync.HistorySyncType.ON_DEMAND ? isLatest : undefined,
 						peerDataRequestSessionId: histNotification.peerDataRequestSessionId
 					})
@@ -338,6 +351,7 @@ const processMessage = async (
 						}
 					}
 				}
+				break
 
 			case proto.Message.ProtocolMessage.Type.MESSAGE_EDIT:
 				ev.emit('messages.update', [

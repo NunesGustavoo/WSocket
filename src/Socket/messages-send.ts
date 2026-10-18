@@ -341,7 +341,10 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				jid,
 				signalId: signalRepository.jidToSignalProtocolAddress(convertlidDevice(jid, lids, meid, melid))
 			}))
-			const sessions = await authState.keys.get('session', pairs.map(p => p.signalId))
+			const sessions = await authState.keys.get(
+				'session',
+				pairs.map(p => p.signalId)
+			)
 			for (const { jid, signalId } of pairs) {
 				if (!sessions[signalId]) {
 					jidsRequiringFetch.push(jid)
@@ -541,7 +544,6 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		return includeUsers
 	}
 
-
 	const relayMessage = async (
 		jid: string,
 		message: proto.IMessage,
@@ -602,8 +604,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		const isNewsletter = server === 'newsletter'
 		// Relays seletivos ocultam por padrão a falha de decrypt nos devices que não receberam
 		// o SKDM. O chamador ainda pode usar decryptFailHide:false para observar o placeholder.
-		const shouldHideDecryptFailure =
-			decryptFailHide ?? !!includeJids?.length
+		const shouldHideDecryptFailure = decryptFailHide ?? !!includeJids?.length
 
 		let shouldIncludeDeviceIdentity = false
 
@@ -680,10 +681,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 						},
 						content: binaryNodeContent
 					}
-					logger.debug(
-						{ msgId, mediaType, hasMediaId: !!newsletterMediaId },
-						`sending newsletter message to ${jid}`
-					)
+					logger.debug({ msgId, mediaType, hasMediaId: !!newsletterMediaId }, `sending newsletter message to ${jid}`)
 					await sendNode(stanza)
 					return
 				}
@@ -902,11 +900,13 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					}
 				}
 
+				const isNativeFlow = !!normalizeMessageContent(message)?.interactiveMessage?.nativeFlowMessage
 				const stanza: BinaryNode = {
 					tag: 'message',
 					attrs: {
 						id: msgId,
 						type: getMessageType(message),
+						...(isNativeFlow ? { device_fanout: 'false' } : {}),
 						...(additionalAttributes || {})
 					},
 					content: binaryNodeContent
@@ -971,9 +971,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 							participantNodes: participants.length,
 							deviceCandidates: devices.length,
 							contentTags: Array.isArray(stanza.content) ? stanza.content.map(node => node.tag) : [],
-							hasSkmsg: binaryNodeContent.some(
-								node => node.tag === 'enc' && node.attrs.type === 'skmsg'
-							),
+							hasSkmsg: binaryNodeContent.some(node => node.tag === 'enc' && node.attrs.type === 'skmsg'),
 							includeCount: includeJids?.length || 0,
 							decryptFailHide: shouldHideDecryptFailure
 						},
@@ -1109,7 +1107,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			? 'payment_info'
 			: nativeFlow?.buttons?.some(button => button.name === 'review_and_pay')
 				? 'order_details'
-				: undefined
+				: nativeFlow?.buttons?.some(button => button.name === 'form_message')
+					? 'form_message'
+					: undefined
 
 		if (paymentFlowName) {
 			return {
@@ -1281,9 +1281,8 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				const isEditMsg = 'edit' in content && !!content.edit
 				const isPinMsg = 'pin' in content && !!content.pin
 				const isPollMessage = 'poll' in content && !!content.poll
-				const newsletterMediaId = (
-					fullMsg.message as (proto.IMessage & { __newsletterMediaId?: string }) | undefined
-				)?.__newsletterMediaId
+				const newsletterMediaId = (fullMsg.message as (proto.IMessage & { __newsletterMediaId?: string }) | undefined)
+					?.__newsletterMediaId
 				const additionalAttributes: BinaryNodeAttributes = {}
 				const additionalNodes: BinaryNode[] = []
 				// required for delete
@@ -1317,10 +1316,8 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					messageId: fullMsg.key.id!,
 					// Relays seletivos não podem depender de metadata/devices antigos: um device
 					// recém-vinculado receberia o skmsg sem o respectivo SKDM.
-					useCachedGroupMetadata:
-						options.includeJids?.length ? false : options.useCachedGroupMetadata,
-					useUserDevicesCache:
-						options.includeJids?.length ? false : options.useUserDevicesCache,
+					useCachedGroupMetadata: options.includeJids?.length ? false : options.useCachedGroupMetadata,
+					useUserDevicesCache: options.includeJids?.length ? false : options.useUserDevicesCache,
 					additionalAttributes,
 					statusJidList: options.statusJidList,
 					newsletterMediaId,

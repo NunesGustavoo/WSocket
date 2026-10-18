@@ -69,16 +69,8 @@ import { BoundedTtlMap } from '../Utils/bounded-ttl-map'
 import caches from '../Utils/cache-utils'
 import { makeMessagesSocket } from './messages-send'
 
-
 export const makeMessagesRecvSocket = (config: SocketConfig) => {
-	const {
-		logger,
-		retryRequestDelayMs,
-		maxMsgRetryCount,
-		getMessage,
-		shouldIgnoreJid,
-		skipReceiptEvents
-	} = config
+	const { logger, retryRequestDelayMs, maxMsgRetryCount, getMessage, shouldIgnoreJid, skipReceiptEvents } = config
 	const pocRelayTrace = process.env.WA_POC_RELAY_TRACE === '1'
 	const sock = makeMessagesSocket(config)
 	const {
@@ -248,11 +240,16 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 		const { account, signedPreKey, signedIdentityKey: identityKey } = authState.creds
 
-		if (retryCount === 1) {
-			//request a resend via phone
-			//const msgId = await requestPlaceholderResend(msgKey)
-			//logger.debug(`sendRetryRequest: requested placeholder resend for message ${msgId}`)
-			//desabilitado por mau funcionamento
+		if (retryCount >= 4) {
+			const pdoKey: WAMessageKey = {
+				remoteJid: jidNormalizedUser(msgKey.remoteJid!),
+				id: msgKey.id,
+				fromMe: msgKey.fromMe,
+				...(msgKey.participant ? { participant: jidNormalizedUser(msgKey.participant) } : {})
+			}
+			requestPlaceholderResend(pdoKey).catch(err => {
+				logger.debug({ err, msgKey }, 'sendRetryRequest: falha ao solicitar placeholder resend para celular')
+			})
 		}
 
 		const deviceIdentity = encodeSignedDeviceIdentity(account!, true)
@@ -494,10 +491,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				}
 
 				for (const storageJid of storedJids) {
-					logger.info(
-						{ event: 'tc_token_received', from, storageJid },
-						'tc token recebido e persistido'
-					)
+					logger.info({ event: 'tc_token_received', from, storageJid }, 'tc token recebido e persistido')
 				}
 				break
 			}
@@ -526,36 +520,30 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 				await handleDevicesNotification(node, child, devices)
 				break
-		case 'server_sync':
-			const updates = getBinaryNodeChildren(node, 'collection')
-			if (updates.length > 0) {
-				// Bot multi-tenant não precisa de blocklist local; ignorar para evitar
-				// loops de "rate-overlimit" em contas com muitos bloqueios acumulados.
-				const SKIP_COLLECTIONS: ReadonlySet<WAPatchName> = new Set(['critical_unblock_low'])
+			case 'server_sync':
+				const updates = getBinaryNodeChildren(node, 'collection')
+				if (updates.length > 0) {
+					// Bot multi-tenant não precisa de blocklist local; ignorar para evitar
+					// loops de "rate-overlimit" em contas com muitos bloqueios acumulados.
+					const SKIP_COLLECTIONS: ReadonlySet<WAPatchName> = new Set(['critical_unblock_low'])
 
-				const collectionNames = updates
-					.map(item => item.attrs.name as WAPatchName)
-					.filter(name => !SKIP_COLLECTIONS.has(name))
+					const collectionNames = updates
+						.map(item => item.attrs.name as WAPatchName)
+						.filter(name => !SKIP_COLLECTIONS.has(name))
 
-				if (collectionNames.length === 0) {
-					logger.debug(
-						{ skipped: updates.map(u => u.attrs.name) },
-						'server_sync ignored (all collections skipped)'
-					)
-					break
+					if (collectionNames.length === 0) {
+						logger.debug({ skipped: updates.map(u => u.attrs.name) }, 'server_sync ignored (all collections skipped)')
+						break
+					}
+
+					try {
+						await appStatePatchMutex.mutex(() => resyncAppState(collectionNames, false))
+					} catch (error: any) {
+						logger.info({ error: error?.message, collections: collectionNames }, 'failed to server_sync state')
+					}
 				}
 
-				try {
-					await appStatePatchMutex.mutex(() => resyncAppState(collectionNames, false))
-				} catch (error: any) {
-					logger.info(
-						{ error: error?.message, collections: collectionNames },
-						'failed to server_sync state'
-					)
-				}
-			}
-
-			break
+				break
 			case 'picture':
 				const setPicture = getBinaryNodeChild(node, 'set')
 				const delPicture = getBinaryNodeChild(node, 'delete')
@@ -748,10 +736,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			context => !context || (!!participantUser && context.allowedUsers.includes(participantUser))
 		)
 		if (!hasRetryableMessage) {
-			logger.info(
-				{ remoteJid, participant, ids },
-				'ignorando retry sem mensagens acessíveis ao participante'
-			)
+			logger.info({ remoteJid, participant, ids }, 'ignorando retry sem mensagens acessíveis ao participante')
 			return
 		}
 
@@ -986,6 +971,101 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		}
 	}
 
+	const shouldSkipPlaceholderResend = (node: BinaryNode): boolean => {
+		const subtype = node.attrs.subtype
+		if (
+			subtype === 'bot_unavailable_fanout' ||
+			subtype === 'hosted_unavailable_fanout' ||
+			subtype === 'view_once_unavailable_fanout'
+		) {
+			return true
+		}
+		const unavailable = getBinaryNodeChild(node, 'unavailable')
+		if (!unavailable) {
+			return false
+		}
+		if (getBinaryNodeChild(node, 'bot')) {
+			return true
+		}
+		if (unavailable.attrs.hosted === 'true') {
+			return true
+		}
+		if (unavailable.attrs.type === 'view_once') {
+			return true
+		}
+		const timestamp = Number(node.attrs.t || Date.now() / 1000)
+		if (Number.isFinite(timestamp)) {
+			const ageSeconds = Date.now() / 1000 - timestamp
+			if (ageSeconds > 14 * 24 * 3600) {
+				return true
+			}
+		}
+		return false
+	}
+
+	const buildPlaceholderResendKey = (node: BinaryNode): WAMessageKey => {
+		const meId = authState.creds.me?.id || ''
+		const meLid = authState.creds.me?.lid || ''
+		const author = node.attrs.participant || node.attrs.from
+		const fromMe = areJidsSameUser(author, meId) || (!!meLid && areJidsSameUser(author, meLid))
+		const isGroup = isJidGroup(node.attrs.from) || isJidStatusBroadcast(node.attrs.from)
+		const chatJid = fromMe && !isGroup ? node.attrs.recipient || node.attrs.from : node.attrs.from
+
+		return {
+			remoteJid: jidNormalizedUser(chatJid),
+			id: node.attrs.id,
+			fromMe,
+			...(!fromMe && isGroup && node.attrs.participant
+				? { participant: jidNormalizedUser(node.attrs.participant) }
+				: {})
+		}
+	}
+
+	const requestPlaceholderResend = async (messageKey: WAMessageKey): Promise<string | undefined> => {
+		if (!authState.creds.me?.id) {
+			throw new Boom('Not authenticated')
+		}
+
+		const msgId = messageKey?.id!
+		if (placeholderResendCache.get(msgId)) {
+			logger.debug({ messageKey }, 'already requested resend')
+			return
+		} else {
+			placeholderResendCache.set(msgId, true)
+		}
+
+		const normalizedKey: WAMessageKey = {
+			remoteJid: jidNormalizedUser(messageKey.remoteJid!),
+			id: messageKey.id,
+			fromMe: messageKey.fromMe,
+			...(messageKey.participant ? { participant: jidNormalizedUser(messageKey.participant) } : {})
+		}
+
+		const pdoMessage: proto.Message.IPeerDataOperationRequestMessage = {
+			placeholderMessageResendRequest: [
+				{
+					messageKey: normalizedKey
+				}
+			],
+			peerDataOperationRequestType: proto.Message.PeerDataOperationRequestType.PLACEHOLDER_MESSAGE_RESEND
+		}
+
+		try {
+			const id = await sendPeerDataOperationMessage(pdoMessage)
+			// 120s: celular lento ou em economia de energia ainda responde; depois disso libera novo pedido
+			setTimeout(() => {
+				if (placeholderResendCache.get(msgId)) {
+					logger.debug({ messageKey }, 'PDO message sem resposta apos 120s')
+					placeholderResendCache.del(msgId)
+				}
+			}, 120_000).unref()
+			return id
+		} catch (err) {
+			placeholderResendCache.del(msgId)
+			throw err
+		}
+	}
+
 	const handleMessage = async (node: BinaryNode) => {
 		let acked = false
 		const ack = async (errorCode?: number) => {
@@ -1048,6 +1128,16 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 						.mutex(async () => {
 							if (ws.isOpen) {
 								if (getBinaryNodeChild(node, 'unavailable')) {
+									if (!shouldSkipPlaceholderResend(node)) {
+										const pdoKey = buildPlaceholderResendKey(node)
+										logger.debug(
+											{ id: node.attrs.id, pdoKey },
+											'solicitando placeholder resend para mensagem unavailable'
+										)
+										await requestPlaceholderResend(pdoKey)
+									} else {
+										logger.debug({ id: node.attrs.id }, 'ignorando placeholder resend para unavailable irrecuperavel')
+									}
 									return
 								}
 
@@ -1130,44 +1220,6 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		return sendPeerDataOperationMessage(pdoMessage)
 	}
 
-	const requestPlaceholderResend = async (messageKey: WAMessageKey): Promise<string | undefined> => {
-		if (!authState.creds.me?.id) {
-			throw new Boom('Not authenticated')
-		}
-
-		if (placeholderResendCache.get(messageKey?.id!)) {
-			logger.debug({ messageKey }, 'already requested resend')
-			return
-		} else {
-			placeholderResendCache.set(messageKey?.id!, true)
-		}
-
-		await delay(5000)
-
-		if (!placeholderResendCache.get(messageKey?.id!)) {
-			logger.debug({ messageKey }, 'message received while resend requested')
-			return 'RESOLVED'
-		}
-
-		const pdoMessage = {
-			placeholderMessageResendRequest: [
-				{
-					messageKey
-				}
-			],
-			peerDataOperationRequestType: proto.Message.PeerDataOperationRequestType.PLACEHOLDER_MESSAGE_RESEND
-		}
-
-		setTimeout(() => {
-			if (placeholderResendCache.get(messageKey?.id!)) {
-				logger.debug({ messageKey }, 'PDO message without response after 15 seconds. Phone possibly offline')
-				placeholderResendCache.del(messageKey?.id!)
-			}
-		}, 15_000)
-
-		return sendPeerDataOperationMessage(pdoMessage)
-	}
-
 	const handleCall = async (node: BinaryNode) => {
 		let status
 		const { attrs } = node
@@ -1175,15 +1227,12 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		const callId = infoChild.attrs['call-id']
 		const from = infoChild.attrs.from || infoChild.attrs['call-creator']
 		status = getCallStatusFromNode(infoChild)
-		if(isLidUser(from) && infoChild.tag==='relaylatency')
-		{
-			const verify = callOfferCache.get(callId);
-			if(!verify)
-			{
-				status = 'offer';
-				callOfferCache.set(callId,true);
+		if (isLidUser(from) && infoChild.tag === 'relaylatency') {
+			const verify = callOfferCache.get(callId)
+			if (!verify) {
+				status = 'offer'
+				callOfferCache.set(callId, true)
 			}
-
 		}
 		const call: WACallEvent = {
 			chatId: attrs.from,
@@ -1212,9 +1261,8 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		// delete data once call has ended
 		if (status === 'reject' || status === 'accept' || status === 'timeout' || status === 'terminate') {
 			callOfferCache.del(call.id)
-			if(isLidUser(from))
-			{
-			 callOfferCache.del(from)	
+			if (isLidUser(from)) {
+				callOfferCache.del(from)
 			}
 		}
 
@@ -1557,40 +1605,40 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				break
 		}
 	}
-		const handlePresenceUpdate = ({ tag, attrs, content }: BinaryNode) => {
-			let presence: PresenceData | undefined
-			const jid = attrs.from
-			const participant = attrs.participant || attrs.from
-	
-			if (shouldIgnoreJid(jid)) {
-				return
-			}
-	
-			if (tag === 'presence') {
-				presence = {
-					lastKnownPresence: attrs.type === 'unavailable' ? 'unavailable' : 'available',
-					lastSeen: attrs.last && attrs.last !== 'deny' ? +attrs.last : undefined
-				}
-			} else if (Array.isArray(content)) {
-				const [firstChild] = content
-				let type = firstChild.tag as WAPresence
-				if (type === 'paused') {
-					type = 'available'
-				}
-	
-				if (firstChild.attrs?.media === 'audio') {
-					type = 'recording'
-				}
-	
-				presence = { lastKnownPresence: type }
-			} else {
-				logger.error({ tag, attrs, content }, 'recv invalid presence node')
-			}
-	
-			if (presence) {
-				ev.emit('presence.update', { id: jid, presences: { [participant]: presence } })
-			}
+	const handlePresenceUpdate = ({ tag, attrs, content }: BinaryNode) => {
+		let presence: PresenceData | undefined
+		const jid = attrs.from
+		const participant = attrs.participant || attrs.from
+
+		if (shouldIgnoreJid(jid)) {
+			return
 		}
+
+		if (tag === 'presence') {
+			presence = {
+				lastKnownPresence: attrs.type === 'unavailable' ? 'unavailable' : 'available',
+				lastSeen: attrs.last && attrs.last !== 'deny' ? +attrs.last : undefined
+			}
+		} else if (Array.isArray(content)) {
+			const [firstChild] = content
+			let type = firstChild.tag as WAPresence
+			if (type === 'paused') {
+				type = 'available'
+			}
+
+			if (firstChild.attrs?.media === 'audio') {
+				type = 'recording'
+			}
+
+			presence = { lastKnownPresence: type }
+		} else {
+			logger.error({ tag, attrs, content }, 'recv invalid presence node')
+		}
+
+		if (presence) {
+			ev.emit('presence.update', { id: jid, presences: { [participant]: presence } })
+		}
+	}
 
 	// recv a message
 	ws.on('CB:message', (node: BinaryNode) => {
