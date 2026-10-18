@@ -53,7 +53,7 @@ import {
 	S_WHATSAPP_NET
 } from '../WABinary'
 import { ParsedDeviceInfo, USyncQuery, USyncUser } from '../WAUSync'
-import { makeNewsletterSocket } from './newsletter'
+import { makeGroupsSocket } from './groups'
 import { makeTcTokenManager } from './tc-token'
 import caches from '../Utils/cache-utils'
 
@@ -73,7 +73,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		patchMessageBeforeSending,
 		cachedGroupMetadata
 	} = config
-	const sock = makeNewsletterSocket(config)
+	const sock = makeGroupsSocket(config)
 	const pocRelayTrace = process.env.WA_POC_RELAY_TRACE === '1'
 	type SelectiveRelayContext = {
 		groupJid: string

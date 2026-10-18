@@ -3,6 +3,7 @@ import axios, { AxiosRequestConfig } from 'axios'
 import { exec } from 'child_process'
 import * as Crypto from 'crypto'
 import { once } from 'events'
+import https from 'https'
 import { createReadStream, createWriteStream, promises as fs, WriteStream } from 'fs'
 import type { IAudioMetadata } from 'music-metadata'
 import { tmpdir } from 'os'
@@ -122,7 +123,8 @@ const extractVideoThumb = async (
 ) =>
 	new Promise<void>((resolve, reject) => {
 		const cmd = `ffmpeg -ss ${time} -i ${path} -y -vf scale=${size.width}:-1 -vframes 1 -f image2 ${destPath}`
-		exec(cmd, err => {
+		// sem teto o ffmpeg pendura quem espera a miniatura
+		exec(cmd, { timeout: 15_000 }, err => {
 			if (err) {
 				reject(err)
 			} else {
@@ -625,6 +627,80 @@ export function extensionForMediaMessage(message: WAMessageContent) {
 	}
 
 	return extension
+}
+
+export const uploadWithNodeHttp = async (
+	url: string,
+	filePath: string,
+	headers: Record<string, string>,
+	fetchAgent?: SocketConfig['fetchAgent'],
+	timeoutMs?: number,
+	redirectCount = 0,
+): Promise<any> => {
+	if (redirectCount > 5) {
+		throw new Error('Too many redirects')
+	}
+
+	const parsedUrl = new URL(url)
+	const fileStats = await fs.stat(filePath)
+
+	return new Promise<any>((resolve, reject) => {
+		const req = https.request(
+			{
+				hostname: parsedUrl.hostname,
+				port: parsedUrl.port || 443,
+				path: parsedUrl.pathname + parsedUrl.search,
+				method: 'POST',
+				headers: {
+					...headers,
+					'Content-Length': fileStats.size,
+				},
+				agent: fetchAgent,
+				timeout: timeoutMs,
+			},
+			res => {
+				if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+					res.resume()
+					const newUrl = new URL(res.headers.location, url).toString()
+					resolve(
+						uploadWithNodeHttp(
+							newUrl,
+							filePath,
+							headers,
+							fetchAgent,
+							timeoutMs,
+							redirectCount + 1,
+						),
+					)
+					return
+				}
+
+				let body = ''
+				res.on('data', chunk => (body += chunk))
+				res.on('end', () => {
+					try {
+						resolve(JSON.parse(body))
+					} catch {
+						reject(new Error(`Invalid JSON response (HTTP ${res.statusCode})`))
+					}
+				})
+				res.on('error', reject)
+			},
+		)
+
+		req.on('error', reject)
+		req.on('timeout', () => {
+			req.destroy()
+			reject(new Error('Upload timeout'))
+		})
+
+		const fileStream = createReadStream(filePath)
+		fileStream.pipe(req)
+		fileStream.on('error', err => {
+			req.destroy()
+			reject(err)
+		})
+	})
 }
 
 export const getWAUploadToServer = (

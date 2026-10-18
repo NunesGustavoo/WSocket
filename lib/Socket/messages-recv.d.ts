@@ -45,30 +45,6 @@ export declare const makeMessagesRecvSocket: (config: SocketConfig) => {
     getSelectiveSentMessage: (groupJid: string, messageId: string) => proto.IMessage | undefined;
     updateMediaMessage: (message: proto.IWebMessageInfo) => Promise<proto.IWebMessageInfo>;
     sendMessage: (jid: string, content: import("../Types").AnyMessageContent, options?: import("../Types").MiscMessageGenerationOptions) => Promise<proto.WebMessageInfo | undefined>;
-    newsletterCreate: (name: string, description?: string) => Promise<import("../Types").NewsletterMetadata>;
-    newsletterUpdate: (jid: string, updates: import("../Types").NewsletterUpdate) => Promise<unknown>;
-    newsletterSubscribers: (jid: string) => Promise<{
-        subscribers: number;
-    }>;
-    newsletterMetadata: (type: "invite" | "jid", key: string) => Promise<import("../Types").NewsletterMetadata | null>;
-    newsletterSubscribed: () => Promise<import("../Types").NewsletterMetadata[]>;
-    newsletterFollow: (jid: string) => Promise<unknown>;
-    newsletterUnfollow: (jid: string) => Promise<unknown>;
-    newsletterMute: (jid: string) => Promise<unknown>;
-    newsletterUnmute: (jid: string) => Promise<unknown>;
-    newsletterUpdateName: (jid: string, name: string) => Promise<unknown>;
-    newsletterUpdateDescription: (jid: string, description: string) => Promise<unknown>;
-    newsletterUpdatePicture: (jid: string, content: import("../Types").WAMediaUpload) => Promise<unknown>;
-    newsletterRemovePicture: (jid: string) => Promise<unknown>;
-    newsletterReactMessage: (jid: string, serverId: string, reaction?: string) => Promise<void>;
-    newsletterFetchMessages: (jid: string, count: number, since: number, after: number) => Promise<any>;
-    subscribeNewsletterUpdates: (jid: string) => Promise<{
-        duration: string;
-    } | null>;
-    newsletterAdminCount: (jid: string) => Promise<number>;
-    newsletterChangeOwner: (jid: string, newOwnerJid: string) => Promise<void>;
-    newsletterDemote: (jid: string, userJid: string) => Promise<void>;
-    newsletterDelete: (jid: string) => Promise<void>;
     groupMetadata: (jid: string) => Promise<import("../Types").GroupMetadata>;
     groupCreate: (subject: string, participants: string[]) => Promise<import("../Types").GroupMetadata>;
     groupLeave: (id: string) => Promise<void>;
@@ -180,6 +156,7 @@ export declare const makeMessagesRecvSocket: (config: SocketConfig) => {
     user: import("../Types").Contact | undefined;
     generateMessageTag: () => string;
     query: (node: BinaryNode, timeoutMs?: number) => Promise<any>;
+    mexQuery: <T = any>(variables: Record<string, any>, queryId: string, key: string) => Promise<T | undefined>;
     waitForMessage: <T>(msgId: string, timeoutMs?: number | undefined) => Promise<any>;
     waitForSocketOpen: () => Promise<void>;
     sendRawMessage: (data: Uint8Array | Buffer) => Promise<void>;

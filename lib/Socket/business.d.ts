@@ -16,10 +16,88 @@ export declare const makeBusinessSocket: (config: SocketConfig) => {
         deleted: number;
     }>;
     productUpdate: (productId: string, update: ProductUpdate) => Promise<import("../Types").Product>;
+    newsletterFollow: (jid: string) => Promise<void>;
+    newsletterUnfollow: (jid: string) => Promise<void>;
+    newsletterMute: (jid: string) => Promise<void>;
+    newsletterUnmute: (jid: string) => Promise<void>;
+    newsletterAdminCount: (jid: string) => Promise<number>;
+    newsletterChangeOwner: (jid: string, newOwnerLid: string) => Promise<void>;
+    newsletterReactMessage: (jid: string, serverId: string, reaction?: string) => Promise<void>;
+    subscribeNewsletterUpdates: (jid: string) => Promise<{
+        duration: string;
+    } | null>;
+    newsletterFetchMessages: (jid: string, { count, before }: {
+        count: number;
+        before?: string | null;
+    }) => Promise<{
+        messages: import("../Types").NewsletterPost[];
+        nextBefore: string | null;
+        hasNextPage: boolean;
+    }>;
+    newsletterQuestionResponses: (jid: string, serverId: string, { count, before }: {
+        count: number;
+        before?: string | null;
+    }) => Promise<{
+        responses: import("../Types").NewsletterQuestionResponse[];
+        nextBefore: string | null;
+        hasNextPage: boolean;
+    }>;
+    newsletterList: () => Promise<import("../Types").NewsletterMetadata[]>;
+    newsletterMetadata: (jid: string) => Promise<import("../Types").NewsletterMetadata>;
+    newsletterMetadataByInvite: (inviteCode: string) => Promise<import("../Types").NewsletterMetadata>;
+    newsletterCreate: (params: {
+        name: string;
+        description?: string;
+        picture?: Buffer;
+    }) => Promise<import("../Types").NewsletterMetadata>;
+    newsletterUpdate: (jid: string, params: {
+        name?: string;
+        description?: string;
+        picture?: Buffer | null;
+    }) => Promise<import("../Types").NewsletterMetadata>;
+    newsletterDelete: (jid: string) => Promise<void>;
+    newsletterAdminInvite: (jid: string, userLid: string, dm?: {
+        to: string;
+        newsletterName?: string;
+        caption?: string;
+    }) => Promise<import("../Types").NewsletterAdminInviteResult>;
+    newsletterAdminInviteRevoke: (jid: string, userLid: string) => Promise<void>;
+    newsletterAdminDemote: (jid: string, userLid: string) => Promise<void>;
+    newsletterSendText: (jid: string, text: string, opts?: {
+        messageId?: string;
+        timeoutMs?: number;
+        question?: boolean;
+    }) => Promise<import("../Types").NewsletterSendResult>;
+    newsletterSendImage: (jid: string, image: Buffer, opts?: {
+        caption?: string;
+        messageId?: string;
+        timeoutMs?: number;
+        question?: boolean;
+    }) => Promise<import("../Types").NewsletterSendResult>;
+    newsletterSendVideo: (jid: string, video: Buffer, opts?: {
+        caption?: string;
+        gifPlayback?: boolean;
+        messageId?: string;
+        timeoutMs?: number;
+    }) => Promise<import("../Types").NewsletterSendResult>;
+    newsletterSendAudio: (jid: string, audio: Buffer, opts?: {
+        ptt?: boolean;
+        messageId?: string;
+        timeoutMs?: number;
+    }) => Promise<import("../Types").NewsletterSendResult>;
+    newsletterSendSticker: (jid: string, sticker: Buffer, opts?: {
+        isAnimated?: boolean;
+        messageId?: string;
+        timeoutMs?: number;
+    }) => Promise<import("../Types").NewsletterSendResult>;
+    newsletterSendPoll: (jid: string, poll: import("../Types").NewsletterPoll, opts?: {
+        messageId?: string;
+        timeoutMs?: number;
+    }) => Promise<import("../Types").NewsletterSendResult>;
     sendMessageAck: (node: BinaryNode, errorCode?: number) => Promise<void>;
     sendRetryRequest: (node: BinaryNode, forceIncludeKeys?: boolean, retryReason?: string) => Promise<void>;
     rejectCall: (callId: string, callFrom: string) => Promise<void>;
-    fetchMessageHistory: (count: number, oldestMsgKey: import("../Types").WAMessageKey, oldestMsgTimestamp: number | Long) => Promise<string>;
+    fetchMessageHistory: (count: number, oldestMsgKey: import("../Types").WAMessageKey, oldestMsgTimestamp: number | import("long").default) => Promise<string>;
     requestPlaceholderResend: (messageKey: import("../Types").WAMessageKey) => Promise<string | undefined>;
     getPrivacyTokens: (jids: string[], timestamp?: number) => Promise<BinaryNode>;
     reissueTcTokenAfterIdentityChange: (jid: string) => Promise<void>;
@@ -57,30 +135,6 @@ export declare const makeBusinessSocket: (config: SocketConfig) => {
     getSelectiveSentMessage: (groupJid: string, messageId: string) => import("../Types").WAProto.IMessage | undefined;
     updateMediaMessage: (message: import("../Types").WAProto.IWebMessageInfo) => Promise<import("../Types").WAProto.IWebMessageInfo>;
     sendMessage: (jid: string, content: AnyMessageContent, options?: import("../Types").MiscMessageGenerationOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
-    newsletterCreate: (name: string, description?: string) => Promise<import("../Types").NewsletterMetadata>;
-    newsletterUpdate: (jid: string, updates: import("../Types").NewsletterUpdate) => Promise<unknown>;
-    newsletterSubscribers: (jid: string) => Promise<{
-        subscribers: number;
-    }>;
-    newsletterMetadata: (type: "invite" | "jid", key: string) => Promise<import("../Types").NewsletterMetadata | null>;
-    newsletterSubscribed: () => Promise<import("../Types").NewsletterMetadata[]>;
-    newsletterFollow: (jid: string) => Promise<unknown>;
-    newsletterUnfollow: (jid: string) => Promise<unknown>;
-    newsletterMute: (jid: string) => Promise<unknown>;
-    newsletterUnmute: (jid: string) => Promise<unknown>;
-    newsletterUpdateName: (jid: string, name: string) => Promise<unknown>;
-    newsletterUpdateDescription: (jid: string, description: string) => Promise<unknown>;
-    newsletterUpdatePicture: (jid: string, content: import("../Types").WAMediaUpload) => Promise<unknown>;
-    newsletterRemovePicture: (jid: string) => Promise<unknown>;
-    newsletterReactMessage: (jid: string, serverId: string, reaction?: string) => Promise<void>;
-    newsletterFetchMessages: (jid: string, count: number, since: number, after: number) => Promise<any>;
-    subscribeNewsletterUpdates: (jid: string) => Promise<{
-        duration: string;
-    } | null>;
-    newsletterAdminCount: (jid: string) => Promise<number>;
-    newsletterChangeOwner: (jid: string, newOwnerJid: string) => Promise<void>;
-    newsletterDemote: (jid: string, userJid: string) => Promise<void>;
-    newsletterDelete: (jid: string) => Promise<void>;
     groupMetadata: (jid: string) => Promise<import("../Types").GroupMetadata>;
     groupCreate: (subject: string, participants: string[]) => Promise<import("../Types").GroupMetadata>;
     groupLeave: (id: string) => Promise<void>;
@@ -192,6 +246,7 @@ export declare const makeBusinessSocket: (config: SocketConfig) => {
     user: import("../Types").Contact | undefined;
     generateMessageTag: () => string;
     query: (node: BinaryNode, timeoutMs?: number) => Promise<any>;
+    mexQuery: <T = any>(variables: Record<string, any>, queryId: string, key: string) => Promise<T | undefined>;
     waitForMessage: <T>(msgId: string, timeoutMs?: number | undefined) => Promise<any>;
     waitForSocketOpen: () => Promise<void>;
     sendRawMessage: (data: Uint8Array | Buffer) => Promise<void>;

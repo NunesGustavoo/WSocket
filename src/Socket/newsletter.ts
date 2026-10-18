@@ -1,293 +1,492 @@
-import type { NewsletterCreateResponse, SocketConfig, WAMediaUpload } from '../Types'
-import { NewsletterMetadata, NewsletterUpdate, QueryIds, XWAPaths } from '../Types'
-import { generateProfilePicture } from '../Utils/messages-media'
-import { getBinaryNodeChild } from '../WABinary'
-import { makeGroupsSocket } from './groups'
-import { executeWMexQuery as genericExecuteWMexQuery } from './mex'
+import { Boom } from '@hapi/boom';
+import { randomBytes } from 'crypto';
+import { proto } from '../../WAProto';
+import { SocketConfig } from '../Types';
+import { MexQueryId } from '../Types/mex-query';
+import type {
+	NewsletterAdminInviteResult,
+	NewsletterMediaKind,
+	NewsletterMetadata,
+	NewsletterPoll,
+	NewsletterPost,
+	NewsletterQuestionResponse,
+	NewsletterSendResult,
+	Xwa2Newsletter,
+	Xwa2NewsletterAdminInviteCreate,
+	Xwa2NewsletterDelete,
+	Xwa2NewsletterMutationResponse,
+} from '../Types/Newsletter';
+import { generateMessageID } from '../Utils/generics';
+import {
+	buildNewsletterMessagesIq,
+	buildNewsletterQuestionResponsesIq,
+	isNewsletterPageCount,
+	isNewsletterServerId,
+	parseNewsletterPosts,
+	parseNewsletterQuestionResponses,
+} from '../Utils/newsletter-messages';
+import { prepareNewsletterMedia } from '../Utils/newsletter-media';
+import { parseAdminInviteExpiration, parseNewsletterMetadata } from '../Utils/newsletter-metadata';
+import { buildNewsletterPollMessage, buildNewsletterPostStanza, buildNewsletterQuestionMessage } from '../Utils/newsletter-post';
+import { getBinaryNodeChild, isJidNewsletter } from '../WABinary';
+import { makeMessagesRecvSocket } from './messages-recv';
 
-const parseNewsletterCreateResponse = (response: NewsletterCreateResponse): NewsletterMetadata => {
-	const { id, thread_metadata: thread, viewer_metadata: viewer } = response
-	return {
-		id: id,
-		owner: undefined,
-		name: thread.name.text,
-		creation_time: parseInt(thread.creation_time, 10),
-		description: thread.description.text,
-		invite: thread.invite,
-		subscribers: parseInt(thread.subscribers_count, 10),
-		verification: thread.verification,
-		picture: {
-			id: thread.picture.id,
-			directPath: thread.picture.direct_path
-		},
-		mute_state: viewer.mute
+const DEFAULT_ACK_TIMEOUT_MS = 30_000;
+const MIN_ACK_TIMEOUT_MS = 5_000;
+
+const badRequest = (message: string) => new Boom(message, { statusCode: 400 });
+
+// resposta null do mex (ID trocado, por exemplo) nunca vira sucesso
+const emptyResponse = (operation: string) =>
+	new Boom(`Resposta vazia do WhatsApp (${operation})`, { statusCode: 502, data: { empty: true, operation } });
+
+const assertChannelJid = (jid: string) => {
+	if (!isJidNewsletter(jid)) throw badRequest(`JID de canal inválido: ${jid}`);
+};
+
+// PN em `user_id` volta 400 do WhatsApp; falha antes de gastar a IQ
+const assertLid = (userId: string) => {
+	if (!userId?.endsWith('@lid')) throw badRequest('user_id das operações de admin precisa ser LID (<n>@lid)');
+};
+
+const toMetadata = (raw: Xwa2Newsletter | null | undefined, operation: string): NewsletterMetadata => {
+	if (!raw) throw emptyResponse(operation);
+	const metadata = parseNewsletterMetadata(raw);
+	if (!metadata) {
+		throw new Boom('Canal não encontrado', { statusCode: 404, data: { stateType: raw.state?.type } });
 	}
-}
-
-const parseNewsletterMetadata = (result: unknown): NewsletterMetadata | null => {
-	if (typeof result !== 'object' || result === null) {
-		return null
-	}
-
-	if ('id' in result && typeof result.id === 'string') {
-		const raw = result as Record<string, unknown>
-		const thread =
-			typeof raw.thread_metadata === 'object' && raw.thread_metadata !== null
-				? (raw.thread_metadata as Record<string, unknown>)
-				: undefined
-		const viewer =
-			typeof raw.viewer_metadata === 'object' && raw.viewer_metadata !== null
-				? (raw.viewer_metadata as Record<string, unknown>)
-				: undefined
-		const textValue = (value: unknown): string | undefined => {
-			if (typeof value === 'string') return value
-			if (typeof value === 'object' && value !== null && typeof (value as Record<string, unknown>).text === 'string') {
-				return (value as Record<string, unknown>).text as string
-			}
-		}
-		const numberValue = (value: unknown): number | undefined => {
-			const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN
-			return Number.isFinite(parsed) ? parsed : undefined
-		}
-		const pictureRaw =
-			typeof thread?.picture === 'object' && thread.picture !== null
-				? (thread.picture as Record<string, unknown>)
-				: undefined
-
-		return {
-			...(raw as unknown as NewsletterMetadata),
-			id: result.id,
-			name: textValue(raw.name) || textValue(thread?.name) || '',
-			description: textValue(raw.description) || textValue(thread?.description),
-			invite: typeof raw.invite === 'string' ? raw.invite : typeof thread?.invite === 'string' ? thread.invite : undefined,
-			creation_time: numberValue(raw.creation_time) || numberValue(thread?.creation_time),
-			subscribers: numberValue(raw.subscribers) || numberValue(thread?.subscribers_count),
-			picture: pictureRaw
-				? {
-					id: typeof pictureRaw.id === 'string' ? pictureRaw.id : undefined,
-					directPath:
-						typeof pictureRaw.direct_path === 'string'
-							? pictureRaw.direct_path
-							: typeof pictureRaw.directPath === 'string'
-								? pictureRaw.directPath
-								: undefined
-				}
-				: (raw.picture as NewsletterMetadata['picture']),
-			verification:
-				raw.verification === 'VERIFIED' || raw.verification === 'UNVERIFIED'
-					? raw.verification
-					: thread?.verification === 'VERIFIED' || thread?.verification === 'UNVERIFIED'
-						? thread.verification
-						: undefined,
-			mute_state:
-				raw.mute_state === 'ON' || raw.mute_state === 'OFF'
-					? raw.mute_state
-					: viewer?.mute === 'ON' || viewer?.mute === 'OFF'
-						? viewer.mute
-						: undefined
-		}
-	}
-
-	if ('result' in result && typeof result.result === 'object' && result.result !== null && 'id' in result.result) {
-		return parseNewsletterMetadata(result.result)
-	}
-
-	return null
-}
+	return metadata;
+};
 
 export const makeNewsletterSocket = (config: SocketConfig) => {
-	const sock = makeGroupsSocket(config)
-	const { query, generateMessageTag } = sock
+	const sock = makeMessagesRecvSocket(config);
+	const { mexQuery, query, relayMessage, refreshMediaConn, generateMessageTag } = sock;
+	const { logger } = config;
 
-	const executeWMexQuery = <T>(variables: Record<string, unknown>, queryId: string, dataPath: string): Promise<T> => {
-		return genericExecuteWMexQuery<T>(variables, queryId, dataPath, query, generateMessageTag)
+	const fetchMetadata = async (key: string, type: 'JID' | 'INVITE') => {
+		const raw = await mexQuery<Xwa2Newsletter>(
+			{
+				input: { key, type, view_role: 'SUBSCRIBER' },
+				fetch_viewer_metadata: true,
+				fetch_full_image: type !== 'INVITE',
+				fetch_creation_time: true,
+				fetch_wamo_sub: false,
+				fetch_status_metadata: false,
+				fetch_pinned_messages: true,
+			},
+			MexQueryId.NewsletterFetch,
+			'xwa2_newsletter',
+		);
+		return toMetadata(raw, 'metadata');
+	};
+
+	/** Lista vazia é `[]`; sem `subscribersCount`, e `pictureDirectPath` é o preview */
+	async function newsletterList(): Promise<NewsletterMetadata[]> {
+		const raw = await mexQuery<Xwa2Newsletter[]>(
+			{ fetch_wamo_sub: false, fetch_status_metadata: false },
+			MexQueryId.NewsletterFetchAll,
+			'xwa2_newsletter_subscribed',
+		);
+		if (!raw) throw emptyResponse('list');
+		// lenient: um canal suspenso sem thread_metadata não pode derrubar a listagem inteira
+		return raw.map(item => parseNewsletterMetadata(item, { lenient: true })).filter((item): item is NewsletterMetadata => !!item);
 	}
 
-	const newsletterUpdate = async (jid: string, updates: NewsletterUpdate) => {
-		const variables = {
-			newsletter_id: jid,
-			updates: {
-				...updates,
-				settings: null
+	/** Boom 404 (`data.stateType`) se o canal não existe ou foi apagado */
+	const newsletterMetadata = (jid: string) => {
+		assertChannelJid(jid);
+		return fetchMetadata(jid, 'JID');
+	};
+
+	/** `inviteCode` é só o código (não o link). `role` vem null. Boom 404 se não existe */
+	async function newsletterMetadataByInvite(inviteCode: string) {
+		if (!inviteCode) throw badRequest('inviteCode vazio');
+		return fetchMetadata(inviteCode, 'INVITE');
+	}
+
+	/** `picture` já normalizada (ex.: `generateProfilePicture`, 640x640 JPEG) */
+	async function newsletterCreate(params: {
+		name: string;
+		description?: string;
+		picture?: Buffer;
+	}): Promise<NewsletterMetadata> {
+		const input: Record<string, string> = { name: params.name };
+		if (params.description !== undefined) input.description = params.description;
+		if (params.picture) input.picture = params.picture.toString('base64');
+
+		const raw = await mexQuery<Xwa2Newsletter>(
+			{ input },
+			MexQueryId.NewsletterCreate,
+			'xwa2_newsletter_create',
+		);
+		return toMetadata(raw, 'create');
+	}
+
+	/** `picture: null` remove a foto (vai como `""`; `null` volta 400); Boom 404 se o canal não existe */
+	async function newsletterUpdate(
+		jid: string,
+		params: { name?: string; description?: string; picture?: Buffer | null },
+	): Promise<NewsletterMetadata> {
+		assertChannelJid(jid);
+		const updates: Record<string, string> = {};
+		if (params.name !== undefined) updates.name = params.name;
+		if (params.description !== undefined) updates.description = params.description;
+		if (params.picture !== undefined) updates.picture = params.picture ? params.picture.toString('base64') : '';
+		if (!Object.keys(updates).length) throw badRequest('Nada para atualizar no canal');
+
+		const raw = await mexQuery<Xwa2Newsletter>(
+			{ newsletter_id: jid, updates },
+			MexQueryId.NewsletterUpdate,
+			'xwa2_newsletter_update',
+		);
+		return toMetadata(raw, 'update');
+	}
+
+	/** Boom 404 se o canal já não existe */
+	async function newsletterDelete(jid: string): Promise<void> {
+		assertChannelJid(jid);
+		const raw = await mexQuery<Xwa2NewsletterDelete>(
+			{ newsletter_id: jid },
+			MexQueryId.NewsletterDelete,
+			'xwa2_newsletter_delete_v2',
+		);
+		if (!raw) throw emptyResponse('delete');
+		const stateType = raw.state?.type;
+		if (stateType === 'DELETED') return;
+		if (stateType === 'NON_EXISTING') {
+			throw new Boom('Canal não encontrado', { statusCode: 404, data: { stateType } });
+		}
+		throw new Boom(`Estado inesperado ao apagar o canal: ${stateType}`, {
+			statusCode: 502,
+			data: { stateType },
+		});
+	}
+
+	/** `userLid` é LID; `dm.to` é o PN que recebe o card, sem o qual o convite não aparece no aparelho dele */
+	async function newsletterAdminInvite(
+		jid: string,
+		userLid: string,
+		dm?: { to: string; newsletterName?: string; caption?: string },
+	): Promise<NewsletterAdminInviteResult> {
+		assertChannelJid(jid);
+		assertLid(userLid);
+
+		const newsletterName = dm ? dm.newsletterName ?? (await newsletterMetadata(jid)).name : '';
+
+		const raw = await mexQuery<Xwa2NewsletterAdminInviteCreate>(
+			{ newsletter_id: jid, user_id: userLid },
+			MexQueryId.NewsletterAdminInviteCreate,
+			'xwa2_newsletter_admin_invite_create',
+		);
+		if (!raw) throw emptyResponse('adminInvite');
+		const expiresAt = parseAdminInviteExpiration(raw);
+		if (!expiresAt) {
+			throw new Boom('Resposta do WhatsApp sem invite_expiration_time', { statusCode: 502, data: raw });
+		}
+
+		let inviteMessageSent = false;
+		if (dm) {
+			try {
+				const sentId = await relayMessage(
+					dm.to,
+					{
+						newsletterAdminInviteMessage: {
+							newsletterJid: jid,
+							newsletterName,
+							caption: dm.caption || undefined,
+							inviteExpiration: Math.floor(expiresAt / 1000),
+						},
+					},
+					{},
+				);
+				// relayMessage devolve null, sem lançar, quando não há device para cifrar
+				inviteMessageSent = !!sentId;
+				if (!sentId) logger.warn('newsletter: convite de admin registrado, DM do card não saiu (sem conteúdo)');
+			} catch (err) {
+				logger.warn({ trace: err?.stack }, 'newsletter: convite de admin registrado, DM do card falhou');
 			}
 		}
-		return executeWMexQuery(variables, QueryIds.UPDATE_METADATA, 'xwa2_newsletter_update')
+
+		return { expiresAt, inviteMessageSent };
+	}
+
+	const adminMutation = async (
+		operation: string,
+		queryId: MexQueryId,
+		key: string,
+		jid: string,
+		userLid: string,
+	) => {
+		assertChannelJid(jid);
+		assertLid(userLid);
+		const raw = await mexQuery<Xwa2NewsletterMutationResponse>(
+			{ newsletter_id: jid, user_id: userLid },
+			queryId,
+			key,
+		);
+		if (!raw) throw emptyResponse(operation);
+	};
+
+	const newsletterAdminInviteRevoke = (jid: string, userLid: string) =>
+		adminMutation(
+			'adminInviteRevoke',
+			MexQueryId.NewsletterAdminInviteRevoke,
+			'xwa2_newsletter_admin_invite_revoke',
+			jid,
+			userLid,
+		);
+
+	const newsletterAdminDemote = (jid: string, userLid: string) =>
+		adminMutation(
+			'adminDemote',
+			MexQueryId.NewsletterAdminDemote,
+			'xwa2_newsletter_admin_demote',
+			jid,
+			userLid,
+		);
+
+	// o ack volta com o id da stanza, então `query` espera por ele, mas não lança em `error="401"`
+	const postPlaintext = async (
+		jid: string,
+		message: proto.IMessage,
+		opts: {
+			messageId?: string;
+			timeoutMs?: number;
+			media?: { mediatype: NewsletterMediaKind; mediaId: string };
+			poll?: boolean;
+			question?: boolean;
+		},
+	): Promise<NewsletterSendResult> => {
+		const messageId = opts.messageId || generateMessageID();
+		const stanza = buildNewsletterPostStanza({
+			to: jid,
+			id: messageId,
+			encodedMessage: proto.Message.encode(opts.question ? buildNewsletterQuestionMessage(message) : message).finish(),
+			media: opts.media,
+			poll: opts.poll,
+			question: opts.question,
+		});
+
+		try {
+			const ack = await query(stanza, opts.timeoutMs ?? DEFAULT_ACK_TIMEOUT_MS);
+			return { messageId, ackAttrs: ack.attrs };
+		} catch (err) {
+			// no timeout o post pode ter saído: quem chama precisa do id para dizer qual
+			if (err instanceof Boom) err.data = { ...(err.data as object), messageId };
+			throw err;
+		}
+	};
+
+	/** `ackAttrs.error` = o WhatsApp recusou; `ackAttrs.server_id` = postou. `timeoutMs` vale só para o ack (padrão 30 s); `question` posta como pergunta */
+	async function newsletterSendText(
+		jid: string,
+		text: string,
+		opts: { messageId?: string; timeoutMs?: number; question?: boolean } = {},
+	): Promise<NewsletterSendResult> {
+		assertChannelJid(jid);
+		return postPlaintext(jid, { conversation: text }, opts);
+	}
+
+	const sendMedia = async (
+		kind: NewsletterMediaKind,
+		jid: string,
+		media: Buffer,
+		opts: { caption?: string; isAnimated?: boolean; messageId?: string; timeoutMs?: number; question?: boolean },
+	): Promise<NewsletterSendResult> => {
+		assertChannelJid(jid);
+		// falha antes do upload: o builder só lançaria o 400 depois de subir até 16 MiB
+		if (opts.question && kind !== 'image') throw badRequest('Pergunta de canal só aceita texto ou imagem');
+		const startedAt = Date.now();
+		const { message, mediaId } = await prepareNewsletterMedia(kind, media, {
+			config,
+			refreshMediaConn,
+			caption: opts.caption,
+			isAnimated: opts.isAnimated,
+			timeoutMs: opts.timeoutMs,
+		});
+		const ackTimeoutMs = opts.timeoutMs
+			? Math.max(opts.timeoutMs - (Date.now() - startedAt), MIN_ACK_TIMEOUT_MS)
+			: undefined;
+		return postPlaintext(jid, message, {
+			messageId: opts.messageId,
+			media: { mediatype: kind, mediaId },
+			timeoutMs: ackTimeoutMs,
+			question: opts.question,
+		});
+	};
+
+	/** `image` JPEG ou PNG (Boom 400 se não for); `timeoutMs` é o orçamento total de upload mais ack (padrão 60 s + 30 s); `question` posta a legenda como pergunta */
+	async function newsletterSendImage(
+		jid: string,
+		image: Buffer,
+		opts: { caption?: string; messageId?: string; timeoutMs?: number; question?: boolean } = {},
+	): Promise<NewsletterSendResult> {
+		return sendMedia('image', jid, image, opts);
+	}
+
+	/** `video` MP4 (Boom 400 se não for); `gifPlayback` posta como GIF; `timeoutMs` como no `newsletterSendImage` */
+	async function newsletterSendVideo(
+		jid: string,
+		video: Buffer,
+		opts: { caption?: string; gifPlayback?: boolean; messageId?: string; timeoutMs?: number } = {},
+	): Promise<NewsletterSendResult> {
+		return sendMedia(opts.gifPlayback ? 'gif' : 'video', jid, video, opts);
+	}
+
+	/** `audio` OGG/Opus (Boom 400 se não for); `ptt` posta como nota de voz; `timeoutMs` como no `newsletterSendImage` */
+	async function newsletterSendAudio(
+		jid: string,
+		audio: Buffer,
+		opts: { ptt?: boolean; messageId?: string; timeoutMs?: number } = {},
+	): Promise<NewsletterSendResult> {
+		return sendMedia(opts.ptt ? 'ptt' : 'audio', jid, audio, opts);
+	}
+
+	/** `sticker` WebP (Boom 400 se não for); sem `isAnimated`, detecta pelo chunk ANIM; `timeoutMs` como no `newsletterSendImage` */
+	async function newsletterSendSticker(
+		jid: string,
+		sticker: Buffer,
+		opts: { isAnimated?: boolean; messageId?: string; timeoutMs?: number } = {},
+	): Promise<NewsletterSendResult> {
+		return sendMedia('sticker', jid, sticker, opts);
+	}
+
+	/** `selectableCount` 1 = escolha única, 0 = múltipla; `timeoutMs` vale só para o ack (padrão 30 s) */
+	async function newsletterSendPoll(
+		jid: string,
+		poll: NewsletterPoll,
+		opts: { messageId?: string; timeoutMs?: number } = {},
+	): Promise<NewsletterSendResult> {
+		assertChannelJid(jid);
+		if (poll.selectableCount !== 0 && poll.selectableCount !== 1) {
+			throw badRequest('selectableCount da enquete de canal precisa ser 0 (múltipla) ou 1 (única)');
+		}
+		return postPlaintext(jid, buildNewsletterPollMessage(poll, randomBytes(32)), { ...opts, poll: true });
+	}
+
+	const assertPageParams = (count: number, before?: string | null) => {
+		if (!isNewsletterPageCount(count)) throw badRequest('count precisa ser inteiro de 1 a 100');
+		if (before != null && !isNewsletterServerId(before)) throw badRequest('before precisa ser só dígitos (id do último item)');
+	};
+
+	/** Posts do canal na ordem do servidor; `before` = `serverId` de um post */
+	async function newsletterFetchMessages(
+		jid: string,
+		{ count, before }: { count: number; before?: string | null },
+	): Promise<{ messages: NewsletterPost[]; nextBefore: string | null; hasNextPage: boolean }> {
+		assertChannelJid(jid);
+		assertPageParams(count, before);
+		const result = await query(buildNewsletterMessagesIq(jid, count, before), 20_000);
+		// ponytail: result sem <messages> vira página vazia; não medido no WhatsApp real
+		const list = getBinaryNodeChild(result, 'messages');
+		return parseNewsletterPosts(list, count, bytes => proto.Message.decode(bytes));
+	}
+
+	/** Respostas de uma pergunta (só dona e admin); `serverId` da pergunta, `before` = `responseServerId` da última da página anterior */
+	async function newsletterQuestionResponses(
+		jid: string,
+		serverId: string,
+		{ count, before }: { count: number; before?: string | null },
+	): Promise<{ responses: NewsletterQuestionResponse[]; nextBefore: string | null; hasNextPage: boolean }> {
+		assertChannelJid(jid);
+		if (!isNewsletterServerId(serverId)) throw badRequest('serverId precisa ser só dígitos');
+		assertPageParams(count, before);
+		const result = await query(buildNewsletterQuestionResponsesIq(jid, serverId, count, before), 20_000);
+		// ponytail: result sem <question_responses> vira página vazia; não medido no WhatsApp real
+		const list = getBinaryNodeChild(result, 'question_responses');
+		return parseNewsletterQuestionResponses(list, count, bytes => proto.Message.decode(bytes));
+	}
+
+	const simpleMutation = async (jid: string, queryId: MexQueryId, key: string) => {
+		assertChannelJid(jid);
+		await mexQuery({ newsletter_id: jid }, queryId, key);
+	};
+
+	const newsletterFollow = (jid: string) =>
+		simpleMutation(jid, MexQueryId.NewsletterFollow, 'xwa2_newsletter_follow');
+	const newsletterUnfollow = (jid: string) =>
+		simpleMutation(jid, MexQueryId.NewsletterUnfollow, 'xwa2_newsletter_unfollow');
+	const newsletterMute = (jid: string) =>
+		simpleMutation(jid, MexQueryId.NewsletterMute, 'xwa2_newsletter_mute_v2');
+	const newsletterUnmute = (jid: string) =>
+		simpleMutation(jid, MexQueryId.NewsletterUnmute, 'xwa2_newsletter_unmute_v2');
+
+	async function newsletterAdminCount(jid: string): Promise<number> {
+		assertChannelJid(jid);
+		const raw = await mexQuery<{ admin_count: number }>(
+			{ newsletter_id: jid },
+			MexQueryId.NewsletterAdminCount,
+			'xwa2_newsletter_admin',
+		);
+		if (!raw) throw emptyResponse('adminCount');
+		return raw.admin_count;
+	}
+
+	async function newsletterChangeOwner(jid: string, newOwnerLid: string): Promise<void> {
+		assertChannelJid(jid);
+		assertLid(newOwnerLid);
+		const raw = await mexQuery(
+			{ newsletter_id: jid, user_id: newOwnerLid },
+			MexQueryId.NewsletterChangeOwner,
+			'xwa2_newsletter_change_owner',
+		);
+		if (!raw) throw emptyResponse('changeOwner');
+	}
+
+	/** `reaction` vazio remove a reação; `serverId` é o do post */
+	async function newsletterReactMessage(jid: string, serverId: string, reaction?: string): Promise<void> {
+		assertChannelJid(jid);
+		await query({
+			tag: 'message',
+			attrs: {
+				to: jid,
+				...(reaction ? {} : { edit: '7' }),
+				type: 'reaction',
+				server_id: serverId,
+				id: generateMessageTag(),
+			},
+			content: [{ tag: 'reaction', attrs: reaction ? { code: reaction } : {} }],
+		});
+	}
+
+	/** Liga as atualizações ao vivo do canal; devolve a duração da assinatura, ou null */
+	async function subscribeNewsletterUpdates(jid: string): Promise<{ duration: string } | null> {
+		assertChannelJid(jid);
+		const result = await query({
+			tag: 'iq',
+			attrs: { id: generateMessageTag(), type: 'set', xmlns: 'newsletter', to: jid },
+			content: [{ tag: 'live_updates', attrs: {}, content: [] }],
+		});
+		const duration = getBinaryNodeChild(result, 'live_updates')?.attrs?.duration;
+		return duration ? { duration } : null;
 	}
 
 	return {
 		...sock,
-		newsletterCreate: async (name: string, description?: string): Promise<NewsletterMetadata> => {
-			const variables = {
-				input: {
-					name,
-					description: description ?? null
-				}
-			}
-			const rawResponse = await executeWMexQuery<NewsletterCreateResponse>(
-				variables,
-				QueryIds.CREATE,
-				XWAPaths.xwa2_newsletter_create
-			)
-			return parseNewsletterCreateResponse(rawResponse)
-		},
-
+		newsletterFollow,
+		newsletterUnfollow,
+		newsletterMute,
+		newsletterUnmute,
+		newsletterAdminCount,
+		newsletterChangeOwner,
+		newsletterReactMessage,
+		subscribeNewsletterUpdates,
+		newsletterFetchMessages,
+		newsletterQuestionResponses,
+		newsletterList,
+		newsletterMetadata,
+		newsletterMetadataByInvite,
+		newsletterCreate,
 		newsletterUpdate,
-
-		newsletterSubscribers: async (jid: string) => {
-			return executeWMexQuery<{ subscribers: number }>(
-				{ newsletter_id: jid },
-				QueryIds.SUBSCRIBERS,
-				XWAPaths.xwa2_newsletter_subscribers
-			)
-		},
-
-		newsletterMetadata: async (type: 'invite' | 'jid', key: string) => {
-			const variables = {
-				fetch_creation_time: true,
-				fetch_full_image: true,
-				fetch_viewer_metadata: true,
-				input: {
-					key,
-					type: type.toUpperCase()
-				}
-			}
-			const result = await executeWMexQuery<unknown>(variables, QueryIds.METADATA, XWAPaths.xwa2_newsletter_metadata)
-			return parseNewsletterMetadata(result)
-		},
-
-		/** Retorna os canais que a conta segue ou administra. */
-		newsletterSubscribed: async (): Promise<NewsletterMetadata[]> => {
-			const result = await executeWMexQuery<unknown[]>(
-				{},
-				QueryIds.SUBSCRIBED,
-				XWAPaths.xwa2_newsletter_subscribed
-			)
-			return result.map(parseNewsletterMetadata).filter((item): item is NewsletterMetadata => item !== null)
-		},
-
-		newsletterFollow: (jid: string) => {
-			return executeWMexQuery({ newsletter_id: jid }, QueryIds.FOLLOW, XWAPaths.xwa2_newsletter_follow)
-		},
-
-		newsletterUnfollow: (jid: string) => {
-			return executeWMexQuery({ newsletter_id: jid }, QueryIds.UNFOLLOW, XWAPaths.xwa2_newsletter_unfollow)
-		},
-
-		newsletterMute: (jid: string) => {
-			return executeWMexQuery({ newsletter_id: jid }, QueryIds.MUTE, XWAPaths.xwa2_newsletter_mute_v2)
-		},
-
-		newsletterUnmute: (jid: string) => {
-			return executeWMexQuery({ newsletter_id: jid }, QueryIds.UNMUTE, XWAPaths.xwa2_newsletter_unmute_v2)
-		},
-
-		newsletterUpdateName: async (jid: string, name: string) => {
-			return await newsletterUpdate(jid, { name })
-		},
-
-		newsletterUpdateDescription: async (jid: string, description: string) => {
-			return await newsletterUpdate(jid, { description })
-		},
-
-		newsletterUpdatePicture: async (jid: string, content: WAMediaUpload) => {
-			const { img } = await generateProfilePicture(content)
-			return await newsletterUpdate(jid, { picture: img.toString('base64') })
-		},
-
-		newsletterRemovePicture: async (jid: string) => {
-			return await newsletterUpdate(jid, { picture: '' })
-		},
-
-		newsletterReactMessage: async (jid: string, serverId: string, reaction?: string) => {
-			await query({
-				tag: 'message',
-				attrs: {
-					to: jid,
-					...(reaction ? {} : { edit: '7' }),
-					type: 'reaction',
-					server_id: serverId,
-					id: generateMessageTag()
-				},
-				content: [
-					{
-						tag: 'reaction',
-						attrs: reaction ? { code: reaction } : {}
-					}
-				]
-			})
-		},
-
-		newsletterFetchMessages: async (jid: string, count: number, since: number, after: number) => {
-			const messageUpdateAttrs: { count: string; since?: string; after?: string } = {
-				count: count.toString()
-			}
-			if (typeof since === 'number') {
-				messageUpdateAttrs.since = since.toString()
-			}
-
-			if (after) {
-				messageUpdateAttrs.after = after.toString()
-			}
-
-			const result = await query({
-				tag: 'iq',
-				attrs: {
-					id: generateMessageTag(),
-					type: 'get',
-					xmlns: 'newsletter',
-					to: jid
-				},
-				content: [
-					{
-						tag: 'message_updates',
-						attrs: messageUpdateAttrs
-					}
-				]
-			})
-			return result
-		},
-
-		subscribeNewsletterUpdates: async (jid: string): Promise<{ duration: string } | null> => {
-			const result = await query({
-				tag: 'iq',
-				attrs: {
-					id: generateMessageTag(),
-					type: 'set',
-					xmlns: 'newsletter',
-					to: jid
-				},
-				content: [{ tag: 'live_updates', attrs: {}, content: [] }]
-			})
-			const liveUpdatesNode = getBinaryNodeChild(result, 'live_updates')
-			const duration = liveUpdatesNode?.attrs?.duration
-			return duration ? { duration: duration } : null
-		},
-
-		newsletterAdminCount: async (jid: string): Promise<number> => {
-			const response = await executeWMexQuery<{ admin_count: number }>(
-				{ newsletter_id: jid },
-				QueryIds.ADMIN_COUNT,
-				XWAPaths.xwa2_newsletter_admin_count
-			)
-			return response.admin_count
-		},
-
-		newsletterChangeOwner: async (jid: string, newOwnerJid: string) => {
-			await executeWMexQuery(
-				{ newsletter_id: jid, user_id: newOwnerJid },
-				QueryIds.CHANGE_OWNER,
-				XWAPaths.xwa2_newsletter_change_owner
-			)
-		},
-
-		newsletterDemote: async (jid: string, userJid: string) => {
-			await executeWMexQuery({ newsletter_id: jid, user_id: userJid }, QueryIds.DEMOTE, XWAPaths.xwa2_newsletter_demote)
-		},
-
-		newsletterDelete: async (jid: string) => {
-			await executeWMexQuery({ newsletter_id: jid }, QueryIds.DELETE, XWAPaths.xwa2_newsletter_delete_v2)
-		}
-	}
-}
-
-export type NewsletterSocket = ReturnType<typeof makeNewsletterSocket>
+		newsletterDelete,
+		newsletterAdminInvite,
+		newsletterAdminInviteRevoke,
+		newsletterAdminDemote,
+		newsletterSendText,
+		newsletterSendImage,
+		newsletterSendVideo,
+		newsletterSendAudio,
+		newsletterSendSticker,
+		newsletterSendPoll,
+	};
+};

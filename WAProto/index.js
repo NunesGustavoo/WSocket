@@ -52537,6 +52537,7 @@ $root.proto = (function() {
          * @property {proto.Message.IMessageHistoryNotice|null} [messageHistoryNotice] Message messageHistoryNotice
          * @property {proto.Message.IFutureProofMessage|null} [groupStatusMessageV2] Message groupStatusMessageV2
          * @property {proto.Message.IFutureProofMessage|null} [botForwardedMessage] Message botForwardedMessage
+         * @property {proto.IQuestionResponseMessage|null} [questionResponseMessage] Message questionResponseMessage
          */
 
         /**
@@ -53267,6 +53268,14 @@ $root.proto = (function() {
         Message.prototype.botForwardedMessage = null;
 
         /**
+         * Message questionResponseMessage.
+         * @member {proto.IQuestionResponseMessage|null|undefined} questionResponseMessage
+         * @memberof proto.Message
+         * @instance
+         */
+        Message.prototype.questionResponseMessage = null;
+
+        /**
          * Creates a new Message instance using the specified properties.
          * @function create
          * @memberof proto.Message
@@ -53468,6 +53477,8 @@ $root.proto = (function() {
                 $root.proto.Message.FutureProofMessage.encode(message.groupStatusMessageV2, writer.uint32(/* id 103, wireType 2 =*/826).fork()).ldelim();
             if (message.botForwardedMessage != null && Object.hasOwnProperty.call(message, "botForwardedMessage"))
                 $root.proto.Message.FutureProofMessage.encode(message.botForwardedMessage, writer.uint32(/* id 104, wireType 2 =*/834).fork()).ldelim();
+            if (message.questionResponseMessage != null && Object.hasOwnProperty.call(message, "questionResponseMessage"))
+                $root.proto.QuestionResponseMessage.encode(message.questionResponseMessage, writer.uint32(/* id 107, wireType 2 =*/858).fork()).ldelim();
             return writer;
         };
 
@@ -53862,6 +53873,10 @@ $root.proto = (function() {
                     }
                 case 104: {
                         message.botForwardedMessage = $root.proto.Message.FutureProofMessage.decode(reader, reader.uint32(), undefined, long + 1);
+                        break;
+                    }
+                case 107: {
+                        message.questionResponseMessage = $root.proto.QuestionResponseMessage.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
                 default:
@@ -54346,6 +54361,11 @@ $root.proto = (function() {
                 if (error)
                     return "botForwardedMessage." + error;
             }
+            if (message.questionResponseMessage != null && message.hasOwnProperty("questionResponseMessage")) {
+                var error = $root.proto.QuestionResponseMessage.verify(message.questionResponseMessage, long + 1);
+                if (error)
+                    return "questionResponseMessage." + error;
+            }
             return null;
         };
 
@@ -54807,6 +54827,11 @@ $root.proto = (function() {
                     throw TypeError(".proto.Message.botForwardedMessage: object expected");
                 message.botForwardedMessage = $root.proto.Message.FutureProofMessage.fromObject(object.botForwardedMessage, long + 1);
             }
+            if (object.questionResponseMessage != null) {
+                if (typeof object.questionResponseMessage !== "object")
+                    throw TypeError(".proto.Message.questionResponseMessage: object expected");
+                message.questionResponseMessage = $root.proto.QuestionResponseMessage.fromObject(object.questionResponseMessage, long + 1);
+            }
             return message;
         };
 
@@ -54913,6 +54938,7 @@ $root.proto = (function() {
                 object.messageHistoryNotice = null;
                 object.groupStatusMessageV2 = null;
                 object.botForwardedMessage = null;
+                object.questionResponseMessage = null;
             }
             if (message.conversation != null && message.hasOwnProperty("conversation"))
                 object.conversation = message.conversation;
@@ -55092,6 +55118,8 @@ $root.proto = (function() {
                 object.groupStatusMessageV2 = $root.proto.Message.FutureProofMessage.toObject(message.groupStatusMessageV2, options);
             if (message.botForwardedMessage != null && message.hasOwnProperty("botForwardedMessage"))
                 object.botForwardedMessage = $root.proto.Message.FutureProofMessage.toObject(message.botForwardedMessage, options);
+            if (message.questionResponseMessage != null && message.hasOwnProperty("questionResponseMessage"))
+                object.questionResponseMessage = $root.proto.QuestionResponseMessage.toObject(message.questionResponseMessage, options);
             return object;
         };
 
@@ -103839,6 +103867,252 @@ $root.proto = (function() {
         })();
 
         return MessageContextInfo;
+    })();
+
+    proto.QuestionResponseMessage = (function() {
+
+        /**
+         * Properties of a QuestionResponseMessage.
+         * @memberof proto
+         * @interface IQuestionResponseMessage
+         * @property {proto.IMessageKey|null} [key] QuestionResponseMessage key
+         * @property {string|null} [text] QuestionResponseMessage text
+         */
+
+        /**
+         * Constructs a new QuestionResponseMessage.
+         * @memberof proto
+         * @classdesc Represents a QuestionResponseMessage.
+         * @implements IQuestionResponseMessage
+         * @constructor
+         * @param {proto.IQuestionResponseMessage=} [properties] Properties to set
+         */
+        function QuestionResponseMessage(properties) {
+            if (properties)
+                for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * QuestionResponseMessage key.
+         * @member {proto.IMessageKey|null|undefined} key
+         * @memberof proto.QuestionResponseMessage
+         * @instance
+         */
+        QuestionResponseMessage.prototype.key = null;
+
+        /**
+         * QuestionResponseMessage text.
+         * @member {string} text
+         * @memberof proto.QuestionResponseMessage
+         * @instance
+         */
+        QuestionResponseMessage.prototype.text = "";
+
+        /**
+         * Creates a new QuestionResponseMessage instance using the specified properties.
+         * @function create
+         * @memberof proto.QuestionResponseMessage
+         * @static
+         * @param {proto.IQuestionResponseMessage=} [properties] Properties to set
+         * @returns {proto.QuestionResponseMessage} QuestionResponseMessage instance
+         */
+        QuestionResponseMessage.create = function create(properties) {
+            return new QuestionResponseMessage(properties);
+        };
+
+        /**
+         * Encodes the specified QuestionResponseMessage message. Does not implicitly {@link proto.QuestionResponseMessage.verify|verify} messages.
+         * @function encode
+         * @memberof proto.QuestionResponseMessage
+         * @static
+         * @param {proto.IQuestionResponseMessage} message QuestionResponseMessage message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        QuestionResponseMessage.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.key != null && Object.hasOwnProperty.call(message, "key"))
+                $root.proto.MessageKey.encode(message.key, writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
+            if (message.text != null && Object.hasOwnProperty.call(message, "text"))
+                writer.uint32(/* id 2, wireType 2 =*/18).string(message.text);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified QuestionResponseMessage message, length delimited. Does not implicitly {@link proto.QuestionResponseMessage.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof proto.QuestionResponseMessage
+         * @static
+         * @param {proto.IQuestionResponseMessage} message QuestionResponseMessage message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        QuestionResponseMessage.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a QuestionResponseMessage message from the specified reader or buffer.
+         * @function decode
+         * @memberof proto.QuestionResponseMessage
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {proto.QuestionResponseMessage} QuestionResponseMessage
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        QuestionResponseMessage.decode = function decode(reader, length, error, long) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            if (long === undefined)
+                long = 0;
+            if (long > $Reader.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            var end = length === undefined ? reader.len : reader.pos + length, message = new $root.proto.QuestionResponseMessage();
+            while (reader.pos < end) {
+                var tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.key = $root.proto.MessageKey.decode(reader, reader.uint32(), undefined, long + 1);
+                        break;
+                    }
+                case 2: {
+                        message.text = reader.string();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7, long);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a QuestionResponseMessage message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof proto.QuestionResponseMessage
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {proto.QuestionResponseMessage} QuestionResponseMessage
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        QuestionResponseMessage.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a QuestionResponseMessage message.
+         * @function verify
+         * @memberof proto.QuestionResponseMessage
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        QuestionResponseMessage.verify = function verify(message, long) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                return "maximum nesting depth exceeded";
+            if (message.key != null && message.hasOwnProperty("key")) {
+                var error = $root.proto.MessageKey.verify(message.key, long + 1);
+                if (error)
+                    return "key." + error;
+            }
+            if (message.text != null && message.hasOwnProperty("text"))
+                if (!$util.isString(message.text))
+                    return "text: string expected";
+            return null;
+        };
+
+        /**
+         * Creates a QuestionResponseMessage message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof proto.QuestionResponseMessage
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {proto.QuestionResponseMessage} QuestionResponseMessage
+         */
+        QuestionResponseMessage.fromObject = function fromObject(object, long) {
+            if (object instanceof $root.proto.QuestionResponseMessage)
+                return object;
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            var message = new $root.proto.QuestionResponseMessage();
+            if (object.key != null) {
+                if (typeof object.key !== "object")
+                    throw TypeError(".proto.QuestionResponseMessage.key: object expected");
+                message.key = $root.proto.MessageKey.fromObject(object.key, long + 1);
+            }
+            if (object.text != null)
+                message.text = String(object.text);
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a QuestionResponseMessage message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof proto.QuestionResponseMessage
+         * @static
+         * @param {proto.QuestionResponseMessage} message QuestionResponseMessage
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        QuestionResponseMessage.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            var object = {};
+            if (options.defaults) {
+                object.key = null;
+                object.text = "";
+            }
+            if (message.key != null && message.hasOwnProperty("key"))
+                object.key = $root.proto.MessageKey.toObject(message.key, options);
+            if (message.text != null && message.hasOwnProperty("text"))
+                object.text = message.text;
+            return object;
+        };
+
+        /**
+         * Converts this QuestionResponseMessage to JSON.
+         * @function toJSON
+         * @memberof proto.QuestionResponseMessage
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        QuestionResponseMessage.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for QuestionResponseMessage
+         * @function getTypeUrl
+         * @memberof proto.QuestionResponseMessage
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        QuestionResponseMessage.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/proto.QuestionResponseMessage";
+        };
+
+        return QuestionResponseMessage;
     })();
 
     proto.MessageKey = (function() {

@@ -1,0 +1,254 @@
+{
+ "tag": "messages",
+ "attrs": {
+  "jid": "120363000000000001@newsletter"
+ },
+ "content": [
+  {
+   "tag": "message",
+   "attrs": {
+    "server_id": "108",
+    "id": "3EB0000000000000000000000000000000000108",
+    "type": "text",
+    "t": "1791399169"
+   },
+   "content": [
+    {
+     "tag": "meta",
+     "attrs": {
+      "questiontype": "question"
+     }
+    },
+    {
+     "tag": "responses_count",
+     "attrs": {
+      "count": "5"
+     }
+    },
+    {
+     "tag": "plaintext",
+     "attrs": {},
+     "content": {
+      "proto": {
+       "questionMessage": {
+        "message": {
+         "extendedTextMessage": {
+          "text": "pergunta ficticia",
+          "contextInfo": {
+           "isQuestion": true
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "tag": "message",
+   "attrs": {
+    "server_id": "107",
+    "id": "3EB0000000000000000000000000000000000107",
+    "type": "text",
+    "t": "1791399100"
+   },
+   "content": [
+    {
+     "tag": "meta",
+     "attrs": {
+      "questiontype": "question"
+     }
+    },
+    {
+     "tag": "plaintext",
+     "attrs": {},
+     "content": {
+      "proto": {
+       "questionMessage": {
+        "message": {
+         "extendedTextMessage": {
+          "text": "pergunta sem resposta"
+         }
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "tag": "message",
+   "attrs": {
+    "server_id": "106",
+    "id": "3EB0000000000000000000000000000000000106",
+    "type": "poll",
+    "t": "1791399000"
+   },
+   "content": [
+    {
+     "tag": "meta",
+     "attrs": {
+      "polltype": "creation"
+     }
+    },
+    {
+     "tag": "plaintext",
+     "attrs": {},
+     "content": {
+      "proto": {
+       "pollCreationMessageV3": {
+        "name": "enquete ficticia",
+        "options": [
+         {
+          "optionName": "a"
+         },
+         {
+          "optionName": "b"
+         }
+        ],
+        "selectableOptionsCount": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "tag": "message",
+   "attrs": {
+    "server_id": "105",
+    "id": "3EB0000000000000000000000000000000000105",
+    "type": "media",
+    "t": "1791398900"
+   },
+   "content": [
+    {
+     "tag": "views_count",
+     "attrs": {
+      "count": "42"
+     }
+    },
+    {
+     "tag": "forwards_count",
+     "attrs": {
+      "count": "3"
+     }
+    },
+    {
+     "tag": "plaintext",
+     "attrs": {
+      "mediatype": "video"
+     },
+     "content": {
+      "proto": {
+       "videoMessage": {
+        "caption": "legenda ficticia",
+        "mimetype": "video/mp4"
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "tag": "message",
+   "attrs": {
+    "server_id": "104",
+    "id": "3EB0000000000000000000000000000000000104",
+    "type": "media",
+    "t": "1791398800"
+   },
+   "content": [
+    {
+     "tag": "plaintext",
+     "attrs": {
+      "mediatype": "ptt"
+     },
+     "content": {
+      "proto": {
+       "audioMessage": {
+        "mimetype": "audio/ogg"
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "tag": "message",
+   "attrs": {
+    "server_id": "103",
+    "id": "3EB0000000000000000000000000000000000103",
+    "type": "text",
+    "t": "1791398700"
+   },
+   "content": [
+    {
+     "tag": "plaintext",
+     "attrs": {},
+     "content": {
+      "proto": {
+       "extendedTextMessage": {
+        "text": "texto ficticio"
+       }
+      }
+     }
+    }
+   ]
+  },
+  {
+   "tag": "message",
+   "attrs": {
+    "server_id": "102",
+    "id": "3EB0000000000000000000000000000000000102",
+    "type": "text",
+    "t": "1791398600"
+   },
+   "content": [
+    {
+     "tag": "plaintext",
+     "attrs": {},
+     "content": {
+      "proto": {
+       "conversation": "conversa ficticia"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "tag": "message",
+   "attrs": {
+    "server_id": "101",
+    "id": "3EB0000000000000000000000000000000000101",
+    "type": "text",
+    "t": "1791398500"
+   },
+   "content": [
+    {
+     "tag": "plaintext",
+     "attrs": {},
+     "content": {
+      "proto": {
+       "extendedTextMessage": {
+        "text": "texto que sera truncado"
+       }
+      },
+      "truncate": 5
+     }
+    }
+   ]
+  },
+  {
+   "tag": "message",
+   "attrs": {
+    "server_id": "100",
+    "id": "3EB0000000000000000000000000000000000100",
+    "type": "novo",
+    "t": "1791398400"
+   },
+   "content": []
+  }
+ ]
+}

@@ -1,0 +1,170 @@
+{
+ "tag": "question_responses",
+ "attrs": {
+  "server_id": "108"
+ },
+ "content": [
+  {
+   "tag": "question_response",
+   "attrs": {},
+   "content": [
+    {
+     "tag": "message",
+     "attrs": {
+      "id": "A58B8E67E28CBBFC69B74204BC3191A3",
+      "type": "text",
+      "t": "1791853566"
+     },
+     "content": [
+      {
+       "tag": "meta",
+       "attrs": {
+        "questiontype": "response",
+        "response_server_id": "9007199254740993"
+       }
+      },
+      {
+       "tag": "plaintext",
+       "attrs": {},
+       "content": {
+        "proto": {
+         "questionResponseMessage": {
+          "key": {
+           "remoteJid": "120363000000000001@newsletter",
+           "fromMe": false,
+           "id": "3EB0000000000000000000000000000000000108"
+          },
+          "text": "resposta tres"
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "tag": "sender",
+     "attrs": {
+      "lid": "100000000000001@lid",
+      "notify_name": "Fulano Ficticio"
+     },
+     "content": [
+      {
+       "tag": "picture",
+       "attrs": {
+        "direct_path": "/m1/v/t24/FICTICIO"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "tag": "question_response",
+   "attrs": {},
+   "content": [
+    {
+     "tag": "message",
+     "attrs": {
+      "id": "B58B8E67E28CBBFC69B74204BC3191A4",
+      "type": "text",
+      "t": "1791853564"
+     },
+     "content": [
+      {
+       "tag": "meta",
+       "attrs": {
+        "questiontype": "response",
+        "response_server_id": "9007199254740991"
+       }
+      },
+      {
+       "tag": "plaintext",
+       "attrs": {},
+       "content": {
+        "proto": {
+         "questionResponseMessage": {
+          "key": {
+           "remoteJid": "120363000000000001@newsletter",
+           "fromMe": false,
+           "id": "3EB0000000000000000000000000000000000108"
+          },
+          "text": "resposta dois truncada"
+         }
+        },
+        "truncate": 5
+       }
+      }
+     ]
+    },
+    {
+     "tag": "sender",
+     "attrs": {
+      "lid": "100000000000002@lid"
+     },
+     "content": [
+      {
+       "tag": "picture",
+       "attrs": {
+        "direct_path": "/m1/v/t24/FICTICIO"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "tag": "question_response",
+   "attrs": {},
+   "content": [
+    {
+     "tag": "message",
+     "attrs": {
+      "id": "C58B8E67E28CBBFC69B74204BC3191A5",
+      "type": "text",
+      "t": "1791853562"
+     },
+     "content": [
+      {
+       "tag": "meta",
+       "attrs": {
+        "questiontype": "response",
+        "response_server_id": "9007199254740990"
+       }
+      },
+      {
+       "tag": "plaintext",
+       "attrs": {},
+       "content": {
+        "proto": {
+         "questionResponseMessage": {
+          "key": {
+           "remoteJid": "120363000000000001@newsletter",
+           "fromMe": false,
+           "id": "3EB0000000000000000000000000000000000108"
+          },
+          "text": "resposta um"
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "tag": "sender",
+     "attrs": {
+      "lid": "100000000000003@lid",
+      "notify_name": "Beltrana"
+     },
+     "content": [
+      {
+       "tag": "picture",
+       "attrs": {
+        "direct_path": "/m1/v/t24/FICTICIO"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

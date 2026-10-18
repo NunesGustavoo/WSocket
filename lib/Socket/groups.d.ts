@@ -128,6 +128,7 @@ export declare const makeGroupsSocket: (config: SocketConfig) => {
     user: import("../Types").Contact | undefined;
     generateMessageTag: () => string;
     query: (node: BinaryNode, timeoutMs?: number) => Promise<any>;
+    mexQuery: <T = any>(variables: Record<string, any>, queryId: string, key: string) => Promise<T | undefined>;
     waitForMessage: <T>(msgId: string, timeoutMs?: number | undefined) => Promise<any>;
     waitForSocketOpen: () => Promise<void>;
     sendRawMessage: (data: Uint8Array | Buffer) => Promise<void>;

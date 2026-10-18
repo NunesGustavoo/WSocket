@@ -37,9 +37,9 @@ makeSocket (socket.ts)           — WebSocket, Noise handshake, tag/callback sy
   └─ makeUSyncSocket (usync.ts)  — USync batch user-info queries
       └─ makeChatsSocket (chats.ts) — app-state sync (LTHash patches), chat/presence/privacy ops
           └─ makeGroupsSocket (groups.ts) — group CRUD and participant management
-              └─ makeNewsletterSocket (newsletter.ts) — WhatsApp Channels/Newsletters (WMex GraphQL-like queries)
-                  └─ makeMessagesSocket (messages-send.ts) — message composition, encryption, relay
-                      └─ makeMessagesRecvSocket (messages-recv.ts) — inbound decryption, retries, receipts
+              └─ makeMessagesSocket (messages-send.ts) — message composition, encryption, relay
+                  └─ makeMessagesRecvSocket (messages-recv.ts) — inbound decryption, retries, receipts
+                      └─ makeNewsletterSocket (newsletter.ts) — WhatsApp Channels: gestão, admin, posts (texto, mídia, enquete, pergunta) via `mexQuery` e stanza `<plaintext>`
                           └─ makeBusinessSocket (business.ts) — catalog, orders, business profile
                               └─ makeWASocket (Socket/index.ts) — merges DEFAULT_CONNECTION_CONFIG and exports
 ```

@@ -25,6 +25,7 @@ export declare const WA_CERT_DETAILS: {
 };
 export declare const PROCESSABLE_HISTORY_TYPES: proto.Message.HistorySyncNotification.HistorySyncType[];
 export declare const DEFAULT_CONNECTION_CONFIG: SocketConfig;
+export { NEWSLETTER_MEDIA_PATH_MAP } from '../Utils/newsletter-post';
 export declare const MEDIA_PATH_MAP: {
     [T in MediaType]?: string;
 };

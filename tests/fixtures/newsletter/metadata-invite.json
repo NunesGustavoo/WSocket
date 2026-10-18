@@ -1,0 +1,39 @@
+{
+  "data": {
+    "xwa2_newsletter": {
+      "id": "120363000000000001@newsletter",
+      "state": {
+        "type": "ACTIVE"
+      },
+      "thread_metadata": {
+        "creation_time": "1791237479",
+        "description": {
+          "id": "1000000000000001",
+          "text": "Descricao ficticia",
+          "update_time": "1791237479751731"
+        },
+        "handle": null,
+        "invite": "0029VaFicticio00000001",
+        "name": {
+          "id": "1000000000000001",
+          "text": "Canal Ficticio",
+          "update_time": "1791237479751731"
+        },
+        "pinned_messages": [],
+        "preview": {
+          "direct_path": "",
+          "id": "1000000000000001",
+          "type": "PREVIEW"
+        },
+        "settings": {
+          "reaction_codes": {
+            "value": "ALL"
+          }
+        },
+        "subscribers_count": "0",
+        "verification": "UNVERIFIED"
+      },
+      "viewer_metadata": null
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "data": {
+    "xwa2_newsletter_subscribed": [
+      {
+        "id": "120363000000000002@newsletter",
+        "state": {
+          "type": "ACTIVE"
+        },
+        "thread_metadata": {
+          "creation_time": "1735948296",
+          "description": {
+            "id": "1000000000000001",
+            "text": "Descricao ficticia dois",
+            "update_time": "1735948325556715"
+          },
+          "handle": null,
+          "invite": "0029VaFicticio00000002",
+          "name": {
+            "id": "1000000000000001",
+            "text": "Canal Ficticio Dois",
+            "update_time": "1735948498502903"
+          },
+          "picture": null,
+          "preview": {
+            "direct_path": "/m1/v/t24/FICTICIO?stp=dst-jpg&oe=00000000",
+            "id": "1000000000000001",
+            "type": "PREVIEW"
+          },
+          "settings": {
+            "reaction_codes": {
+              "value": "ALL"
+            }
+          },
+          "verification": "UNVERIFIED"
+        },
+        "viewer_metadata": {
+          "role": "ADMIN",
+          "settings": [
+            {
+              "type": "MUTE_FOLLOWER_ACTIVITY",
+              "value": "OFF"
+            },
+            {
+              "type": "MUTE_ADMIN_ACTIVITY",
+              "value": "OFF"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

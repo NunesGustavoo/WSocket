@@ -90,6 +90,7 @@ export declare const downloadContentFromMessage: ({ mediaKey, directPath, url }:
  * */
 export declare const downloadEncryptedContent: (downloadUrl: string, { cipherKey, iv }: MediaDecryptionKeyInfo, { startByte, endByte, options }?: MediaDownloadOptions) => Promise<Transform>;
 export declare function extensionForMediaMessage(message: WAMessageContent): string;
+export declare const uploadWithNodeHttp: (url: string, filePath: string, headers: Record<string, string>, fetchAgent?: SocketConfig["fetchAgent"], timeoutMs?: number, redirectCount?: number) => Promise<any>;
 export declare const getWAUploadToServer: ({ customUploadHosts, fetchAgent, logger, options }: SocketConfig, refreshMediaConn: (force: boolean) => Promise<MediaConnInfo>) => WAMediaUploadFunction;
 /**
  * Generate a binary node that will request the phone to re-upload the media & return the newly uploaded URL

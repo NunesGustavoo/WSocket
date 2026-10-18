@@ -226,6 +226,36 @@ export const makeSocket = (config: SocketConfig) => {
 		return result
 	}
 
+	/** query GraphQL do `w:mex`; devolve `data[key]` (undefined se o servidor mandar null) */
+	async function mexQuery<T = any>(variables: Record<string, any>, queryId: string, key: string): Promise<T | undefined> {
+		const iqResult = await query({
+			tag: 'iq',
+			attrs: { type: 'get', to: S_WHATSAPP_NET, xmlns: 'w:mex' },
+			content: [
+				{
+					tag: 'query',
+					attrs: { query_id: queryId },
+					content: Buffer.from(JSON.stringify({ variables }), 'utf-8')
+				}
+			]
+		})
+		const result = getBinaryNodeChild(iqResult, 'result')?.content
+		if (!result) {
+			throw new Boom('GraphQL query error: no result node', { data: iqResult })
+		}
+
+		const data = JSON.parse(result.toString())
+		if (data?.errors?.length) {
+			logger.error({ data }, 'GraphQL query error')
+			throw new Boom(data.errors.map((e: { message?: string }) => e.message).join('; '), {
+				data,
+				statusCode: data.errors[0]?.extensions?.error_code || 500
+			})
+		}
+
+		return data?.data?.[key] as T
+	}
+
 	/** connection handshake */
 	const validateConnection = async () => {
 		let helloMsg: proto.IHandshakeMessage = {
@@ -811,6 +841,7 @@ export const makeSocket = (config: SocketConfig) => {
 		},
 		generateMessageTag,
 		query,
+		mexQuery,
 		waitForMessage,
 		waitForSocketOpen,
 		sendRawMessage,

@@ -27,7 +27,7 @@ export declare const extractE2ESessionFromRetryReceipt: (receipt: BinaryNode) =>
     signedPreKey: {
         keyId: number;
         publicKey: Buffer<ArrayBufferLike>;
-        signature: Buffer<ArrayBufferLike> | Uint8Array<ArrayBufferLike>;
+        signature: Uint8Array<ArrayBufferLike> | Buffer<ArrayBufferLike>;
     };
     preKey: {
         keyId: number;

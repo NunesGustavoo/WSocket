@@ -75,6 +75,8 @@ export const DEFAULT_CONNECTION_CONFIG: SocketConfig = {
 	makeSignalRepository: makeLibSignalRepository
 }
 
+export { NEWSLETTER_MEDIA_PATH_MAP } from '../Utils/newsletter-post'
+
 export const MEDIA_PATH_MAP: { [T in MediaType]?: string } = {
 	image: '/mms/image',
 	video: '/mms/video',

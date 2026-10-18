@@ -16,10 +16,10 @@ import {
 } from '../Utils/business'
 import { BinaryNode, isJidUser, isLidUser, jidNormalizedUser, S_WHATSAPP_NET, STORIES_JID } from '../WABinary'
 import { getBinaryNodeChild } from '../WABinary/generic-utils'
-import { makeMessagesRecvSocket } from './messages-recv'
+import { makeNewsletterSocket } from './newsletter'
 
 export const makeBusinessSocket = (config: SocketConfig) => {
-	const sock = makeMessagesRecvSocket(config)
+	const sock = makeNewsletterSocket(config)
 	const { authState, query, waUploadToServer } = sock
 
 	/** Publica texto, imagem ou vídeo no Status do WhatsApp. */
