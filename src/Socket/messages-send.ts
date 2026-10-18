@@ -34,6 +34,7 @@ import {
 	convertlidDevice,
 	encodeNewsletterMessage
 } from '../Utils'
+import { buildInteractiveBizNode, groupStatusNodes, unwrapGroupStatus } from '../Utils/business-node'
 import { getUrlInfo } from '../Utils/link-preview'
 import { BoundedTtlMap } from '../Utils/bounded-ttl-map'
 import { makeKeyedMutex } from '../Utils/make-mutex'
@@ -900,13 +901,11 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					}
 				}
 
-				const isNativeFlow = !!normalizeMessageContent(message)?.interactiveMessage?.nativeFlowMessage
 				const stanza: BinaryNode = {
 					tag: 'message',
 					attrs: {
 						id: msgId,
 						type: getMessageType(message),
-						...(isNativeFlow ? { device_fanout: 'false' } : {}),
 						...(additionalAttributes || {})
 					},
 					content: binaryNodeContent
@@ -949,8 +948,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					meIds: [meId, meLid]
 				})
 
-				if (additionalNodes && additionalNodes.length > 0) {
-					;(stanza.content as BinaryNode[]).push(...additionalNodes)
+				const extraNodes = [...(additionalNodes || []), ...groupStatusNodes(message, additionalNodes)]
+				if (extraNodes.length > 0) {
+					;(stanza.content as BinaryNode[]).push(...extraNodes)
 				}
 
 				const hasCustomBizNode = additionalNodes?.some(node => node.tag === 'biz')
@@ -1012,6 +1012,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 	}
 
 	const getMessageType = (message: proto.IMessage) => {
+		message = unwrapGroupStatus(message)
 		if (message.pollCreationMessage || message.pollCreationMessageV2 || message.pollCreationMessageV3) {
 			return 'poll'
 		}
@@ -1026,7 +1027,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 	}
 
 	const getMediaType = (message: proto.IMessage) => {
-		message = normalizeMessageContent(message) || message
+		message = normalizeMessageContent(unwrapGroupStatus(message)) || message
 
 		if (message.imageMessage) {
 			return 'image'
@@ -1102,46 +1103,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			host_storage: '2',
 			privacy_mode_ts: unixTimestampSeconds().toString()
 		}
-		const nativeFlow = content.interactiveMessage?.nativeFlowMessage
-		const paymentFlowName = nativeFlow?.buttons?.some(button => button.name === 'payment_info')
-			? 'payment_info'
-			: nativeFlow?.buttons?.some(button => button.name === 'review_and_pay')
-				? 'order_details'
-				: nativeFlow?.buttons?.some(button => button.name === 'form_message')
-					? 'form_message'
-					: undefined
-
-		if (paymentFlowName) {
-			return {
-				tag: 'biz',
-				attrs: {
-					...attrs,
-					native_flow_name: paymentFlowName
-				}
-			}
-		}
-
-		if (nativeFlow || content.buttonsMessage) {
-			return {
-				tag: 'biz',
-				attrs,
-				content: [
-					{
-						tag: 'interactive',
-						attrs: { type: 'native_flow', v: '1' },
-						content: [
-							{
-								tag: 'native_flow',
-								attrs: { v: '9', name: 'mixed' }
-							}
-						]
-					},
-					{
-						tag: 'quality_control',
-						attrs: { source_type: 'third_party' }
-					}
-				]
-			}
+		const interactiveNode = buildInteractiveBizNode(content, attrs)
+		if (interactiveNode) {
+			return interactiveNode
 		}
 
 		const buttonType = getButtonType(content)
