@@ -178,7 +178,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			return provided
 		}
 
-		const cache = new NodeCache<any>({ stdTTL, useClones: false })
+		const cache = new NodeCache({ stdTTL, useClones: false })
 		sock.onSocketEnd(() => cache.close())
 		return cache
 	}

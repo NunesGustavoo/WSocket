@@ -94,7 +94,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 	if (config.placeholderResendCache) {
 		placeholderResendCache = config.placeholderResendCache
 	} else {
-		const cache = new NodeCache<any>({
+		const cache = new NodeCache({
 			stdTTL: DEFAULT_CACHE_TTLS.MSG_RETRY, // 1 hour
 			useClones: false
 		})

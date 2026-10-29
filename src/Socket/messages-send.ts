@@ -119,7 +119,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 	if (config.userDevicesCache) {
 		userDevicesCache = config.userDevicesCache
 	} else {
-		const cache = new NodeCache<any>({
+		const cache = new NodeCache({
 			stdTTL: DEFAULT_CACHE_TTLS.USER_DEVICES,
 			useClones: false
 		})
