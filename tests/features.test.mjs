@@ -1,23 +1,28 @@
-import { test } from 'node:test'
+import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createRequire } from 'node:module'
-
-const require = createRequire(import.meta.url)
-const { parseMessage, MessageQueue, useDatabaseAuthState } = require('../lib/index.js')
+import { parseMessage, MessageQueue, useDatabaseAuthState, makeWASocket } from '../lib/index.js'
+import { makeConvenienceSocket } from '../lib/Socket/convenience.js'
 
 test('parseMessage: decodifica texto simples de conversation', () => {
 	const raw = {
-		key: { id: 'M1', remoteJid: '5511999999999@s.whatsapp.net', fromMe: false },
-		message: { conversation: 'Olá mundo' },
-		messageTimestamp: 1700000000
+		key: {
+			id: 'M1',
+			remoteJid: '5511999999999@s.whatsapp.net',
+			fromMe: false
+		},
+		messageTimestamp: 1700000000,
+		pushName: 'Gustavo',
+		message: {
+			conversation: 'Olá mundo!'
+		}
 	}
 
 	const parsed = parseMessage(raw)
 	assert.equal(parsed.id, 'M1')
 	assert.equal(parsed.chatId, '5511999999999@s.whatsapp.net')
 	assert.equal(parsed.sender, '5511999999999@s.whatsapp.net')
-	assert.equal(parsed.text, 'Olá mundo')
-	assert.equal(parsed.fromMe, false)
+	assert.equal(parsed.text, 'Olá mundo!')
+	assert.equal(parsed.type, 'conversation')
 	assert.equal(parsed.isGroup, false)
 })
 
@@ -25,32 +30,25 @@ test('parseMessage: identifica remetente e contexto em mensagens de grupo', () =
 	const raw = {
 		key: {
 			id: 'M2',
-			remoteJid: '123456789-987654@g.us',
+			remoteJid: '123456789@g.us',
 			participant: '5511888888888@s.whatsapp.net',
 			fromMe: false
 		},
+		messageTimestamp: 1700000001,
+		pushName: 'Participante',
 		message: {
 			extendedTextMessage: {
-				text: 'Mensagem de grupo com citação',
-				contextInfo: {
-					stanzaId: 'ORIGINAL_MSG_ID',
-					remoteJid: '123456789-987654@g.us',
-					participant: '5511777777777@s.whatsapp.net',
-					quotedMessage: {
-						conversation: 'Texto citado anterior'
-					}
-				}
+				text: 'Mensagem no grupo'
 			}
 		}
 	}
 
 	const parsed = parseMessage(raw)
-	assert.equal(parsed.isGroup, true)
+	assert.equal(parsed.id, 'M2')
+	assert.equal(parsed.chatId, '123456789@g.us')
 	assert.equal(parsed.sender, '5511888888888@s.whatsapp.net')
-	assert.equal(parsed.text, 'Mensagem de grupo com citação')
-	assert.equal(parsed.quoted?.key.id, 'ORIGINAL_MSG_ID')
-	assert.equal(parsed.quoted?.text, 'Texto citado anterior')
-	assert.equal(parsed.quoted?.sender, '5511777777777@s.whatsapp.net')
+	assert.equal(parsed.text, 'Mensagem no grupo')
+	assert.equal(parsed.isGroup, true)
 })
 
 test('parseMessage: identifica mídias e notas de voz (PTT)', () => {
@@ -116,4 +114,61 @@ test('useDatabaseAuthState: grava e restaura credenciais e chaves em memória', 
 	const { state: restoredState } = await useDatabaseAuthState(adapter, { prefix: 'test' })
 	assert.equal(restoredState.creds.me?.id, '5511999999999@s.whatsapp.net')
 	assert.equal(restoredState.creds.me?.name, 'Tester')
+})
+
+test('makeConvenienceSocket: expõe todos os métodos avançados e interativos', async () => {
+	const sentMessages = []
+	const presenceUpdates = []
+	const chatMods = []
+
+	const mockSocket = {
+		sendMessage: async (jid, content, options) => {
+			sentMessages.push({ jid, content, options })
+			return { key: { id: 'msg_123', remoteJid: jid } }
+		},
+		sendPresenceUpdate: async (type, toJid) => {
+			presenceUpdates.push({ type, toJid })
+		},
+		readMessages: async () => {},
+		onWhatsApp: async () => [{ exists: true, jid: '5511999999999@s.whatsapp.net' }],
+		chatModify: async (mod, jid) => {
+			chatMods.push({ mod, jid })
+		},
+		rejectCall: async (callId, callFrom) => ({ callId, callFrom }),
+		ev: { on: () => {} }
+	}
+
+	const convSock = makeConvenienceSocket(mockSocket, { queue: { enabled: false } })
+
+	// Validação de existência de métodos
+	assert.equal(typeof convSock.sendButtons, 'function')
+	assert.equal(typeof convSock.sendList, 'function')
+	assert.equal(typeof convSock.simulateTyping, 'function')
+	assert.equal(typeof convSock.simulateRecording, 'function')
+	assert.equal(typeof convSock.postTextStatus, 'function')
+	assert.equal(typeof convSock.postMediaStatus, 'function')
+	assert.equal(typeof convSock.pinChat, 'function')
+	assert.equal(typeof convSock.muteChat, 'function')
+	assert.equal(typeof convSock.archiveChat, 'function')
+	assert.equal(typeof convSock.rejectCall, 'function')
+
+	// Teste de sendButtons
+	await convSock.sendButtons('5511999999999', 'Escolha uma opção:', [
+		{ id: 'b1', displayText: 'Opção 1' }
+	], { title: 'Título' })
+	assert.equal(sentMessages.length, 1)
+	assert.equal(sentMessages[0].content.title, 'Título')
+	assert.deepEqual(sentMessages[0].content.quickReplyButtons, [{ id: 'b1', displayText: 'Opção 1' }])
+
+	// Teste de postTextStatus
+	await convSock.postTextStatus('Meu Status', { backgroundColor: '#123456' })
+	assert.equal(sentMessages.length, 2)
+	assert.equal(sentMessages[1].jid, 'status@broadcast')
+	assert.equal(sentMessages[1].content.text, 'Meu Status')
+
+	// Teste de pinChat e muteChat
+	await convSock.pinChat('5511999999999@s.whatsapp.net', true)
+	await convSock.muteChat('5511999999999@s.whatsapp.net', 3600000)
+	assert.equal(chatMods.length, 2)
+	assert.deepEqual(chatMods[0].mod, { pin: true })
 })

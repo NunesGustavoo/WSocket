@@ -263,19 +263,51 @@ declare const makeWASocket: (config: UserFacingSocketConfig) => {
 } & {
     queue: import("..").MessageQueue;
     configureQueue: (config: Partial<import("../Types").QueueConfig>) => void;
-    sendText: (jid: string, text: string, options?: import("../Types").SendTextOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
-    sendImage: (jid: string, image: import("../Types").WAMediaUpload, options?: import("../Types").SendMediaOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
-    sendVideo: (jid: string, video: import("../Types").WAMediaUpload, options?: import("../Types").SendMediaOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
-    sendVoice: (jid: string, audio: import("../Types").WAMediaUpload, options?: import("../Types").SendVoiceOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
-    sendDocument: (jid: string, document: import("../Types").WAMediaUpload, options?: import("../Types").SendMediaOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
-    react: (key: import("../Types").WAMessageKey, emoji: string) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
-    markAsRead: (keys: import("../Types").WAMessageKey | import("../Types").WAMessageKey[]) => Promise<void>;
+    sendText: (jid: string, text: string, options?: import("../Types").SendTextOptions) => Promise<any>;
+    sendImage: (jid: string, image: import("../Types").WAMediaUpload, options?: import("../Types").SendMediaOptions) => Promise<any>;
+    sendVideo: (jid: string, video: import("../Types").WAMediaUpload, options?: import("../Types").SendMediaOptions) => Promise<any>;
+    sendVoice: (jid: string, audio: import("../Types").WAMediaUpload, options?: import("../Types").SendVoiceOptions) => Promise<any>;
+    sendDocument: (jid: string, document: import("../Types").WAMediaUpload, options?: import("../Types").SendMediaOptions) => Promise<any>;
+    react: (key: import("../Types").WAMessageKey, emoji: string) => Promise<any>;
+    markAsRead: (keys: import("../Types").WAMessageKey | import("../Types").WAMessageKey[]) => Promise<any>;
     downloadMedia: (msg: import("../Types").WAMessage | import("..").ParsedMessage) => Promise<Buffer>;
     resolveJid: (phoneOrJid: string) => Promise<string | undefined>;
+    sendButtons: (jid: string, text: string, buttons: import("../Types").QuickReplyButtonItem[], options?: import("../Types").SendButtonsOptions) => Promise<any>;
+    sendList: (jid: string, text: string, sections: import("../Types").ListSectionItem[], options?: import("../Types").SendListOptions) => Promise<any>;
+    simulateTyping: (jid: string, durationMs?: number) => Promise<void>;
+    simulateRecording: (jid: string, durationMs?: number) => Promise<void>;
+    setStealthMode: (stealth: boolean) => Promise<any>;
+    batchQueryContacts: (jids: string[], options?: import("../Types").BatchContactQueryOptions) => Promise<import("../Types").BatchContactQueryResult[]>;
+    fetchChatHistory: (count: number, oldestMsgKey: import("../Types").WAMessageKey, oldestMsgTimestamp: number | Long) => Promise<any>;
     onMessage: (callback: import("./convenience").MessageEvents["message"]) => any;
     onText: (callback: import("./convenience").MessageEvents["message:text"]) => any;
     onAudio: (callback: import("./convenience").MessageEvents["message:audio"]) => any;
     onImage: (callback: import("./convenience").MessageEvents["message:image"]) => any;
     onInteractive: (callback: import("./convenience").MessageEvents["message:interactive"]) => any;
+    postTextStatus: (text: string, options?: {
+        backgroundColor?: string;
+        font?: number;
+        statusJidList?: string[];
+    }) => Promise<any>;
+    postMediaStatus: (content: {
+        image: import("../Types").WAMediaUpload;
+        caption?: string;
+    } | {
+        video: import("../Types").WAMediaUpload;
+        caption?: string;
+    }, options?: {
+        statusJidList?: string[];
+    }) => Promise<any>;
+    pinChat: (jid: string, pin?: boolean) => Promise<any>;
+    muteChat: (jid: string, durationMs?: number | null) => Promise<any>;
+    archiveChat: (jid: string, archive?: boolean, lastMessages?: any[]) => Promise<any>;
+    starMessage: (jid: string, messages: {
+        id: string;
+        fromMe?: boolean;
+    }[], star?: boolean) => Promise<any>;
+    rejectCall: (callId: string, callFrom: string) => Promise<any>;
+    onCall: (callback: import("./convenience").MessageEvents["call"]) => any;
+    onGroupParticipantsUpdate: (callback: import("./convenience").MessageEvents["group:participant"]) => any;
+    onReaction: (callback: import("./convenience").MessageEvents["reaction"]) => any;
 };
 export default makeWASocket;

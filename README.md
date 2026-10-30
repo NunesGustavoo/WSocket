@@ -277,6 +277,51 @@ await sock.sendDocument('5511999999999@s.whatsapp.net', docBuffer, { fileName: '
 await sock.react(msg.key, '✅')
 await sock.markAsRead(msg.key)
 
+// Botões Nativos (Quick Reply via nós <biz>):
+await sock.sendButtons('5511999999999@s.whatsapp.net', 'Escolha uma opção:', [
+    { id: 'btn_1', displayText: 'Falar com suporte' },
+    { id: 'btn_2', displayText: 'Conhecer planos' }
+], { title: 'Atendimento Centra', footer: 'Selecione abaixo' })
+
+// Listas e Menus Suspensos:
+await sock.sendList('5511999999999@s.whatsapp.net', 'Selecione um serviço:', [
+    {
+        title: 'Suporte Técnico',
+        rows: [
+            { id: 'srv_1', title: 'Financeiro', description: '2ª via de boleto ou faturas' },
+            { id: 'srv_2', title: 'Ativação', description: 'Dúvidas sobre o produto' }
+        ]
+    }
+], { buttonText: 'Ver Categorias' })
+
+// Postagem nos Stories / Status do WhatsApp:
+await sock.postTextStatus('Promoção relâmpago hoje!', { backgroundColor: '#25D366', font: 2 })
+await sock.postMediaStatus({ image: fs.readFileSync('./banner.png'), caption: 'Novidades!' })
+
+// Gestão de Conversas (Fixar, Silenciar, Arquivar):
+await sock.pinChat('5511999999999@s.whatsapp.net', true)
+await sock.muteChat('5511999999999@s.whatsapp.net', 8 * 3600 * 1000) // 8 horas
+await sock.archiveChat('5511999999999@s.whatsapp.net', true)
+
+// Simulação de presença e Modo Fantasma (Stealth):
+await sock.simulateTyping('5511999999999@s.whatsapp.net', 2500)
+await sock.setStealthMode(true) // Fica invisível (sempre offline)
+
+// Interceptação e Rejeição de Chamadas:
+sock.onCall(async (call) => {
+    if (call.status === 'offer') {
+        await sock.rejectCall(call.id, call.from)
+        await sock.sendText(call.from, 'Olá! Este canal automático não aceita chamadas.')
+    }
+})
+
+// Consulta em lote de contatos (USync):
+const contacts = await sock.batchQueryContacts(['5511999999999@s.whatsapp.net'], {
+    status: true,
+    devices: true,
+    botProfile: true
+})
+
 // Download direto de mídia:
 const mediaBuffer = await sock.downloadMedia(msg)
 

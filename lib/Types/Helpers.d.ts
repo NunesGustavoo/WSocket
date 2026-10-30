@@ -28,6 +28,50 @@ export interface SendVoiceOptions extends OutgoingMessageOptions {
     /** Se true, envia com onda sonora / PTT verde como se tivesse gravado no celular (padrão: true) */
     ptt?: boolean;
 }
+export interface QuickReplyButtonItem {
+    id: string;
+    displayText: string;
+}
+export interface SendButtonsOptions extends OutgoingMessageOptions {
+    title?: string;
+    subtitle?: string;
+    footer?: string;
+    quoted?: proto.IWebMessageInfo;
+}
+export interface ListRowItem {
+    id: string;
+    title: string;
+    description?: string;
+}
+export interface ListSectionItem {
+    title: string;
+    rows: ListRowItem[];
+}
+export interface SendListOptions extends OutgoingMessageOptions {
+    title?: string;
+    footer?: string;
+    buttonText?: string;
+    quoted?: proto.IWebMessageInfo;
+}
+export interface BatchContactQueryOptions {
+    status?: boolean;
+    devices?: boolean;
+    disappearingMode?: boolean;
+    botProfile?: boolean;
+}
+export interface BatchContactQueryResult {
+    id: string;
+    status?: string;
+    devices?: {
+        id: number;
+        keyIndex?: number;
+    }[];
+    disappearingMode?: {
+        duration: number;
+        setAt: Date;
+    };
+    isBot?: boolean;
+}
 export interface QueueConfig {
     /**
      * Se a fila anti-ban está habilitada
