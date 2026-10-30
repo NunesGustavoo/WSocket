@@ -10,6 +10,7 @@ export * from './Product'
 export * from './Call'
 export * from './Signal'
 export * from './Newsletter'
+export * from './Helpers'
 
 import { AuthenticationState } from './Auth'
 import { SocketConfig } from './Socket'

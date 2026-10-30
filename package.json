@@ -1,20 +1,20 @@
 {
-  "name": "@centra/wsocket",
-  "version": "1.0.0",
-  "description": "Biblioteca WebSocket para WhatsApp Web - Engine Centra",
+  "name": "wsocket",
+  "version": "6.7.19",
+  "description": "A WebSockets library for interacting with WhatsApp Web directly",
   "keywords": [
     "whatsapp",
-    "centra",
     "wsocket",
-    "baileys"
+    "baileys",
+    "automation"
   ],
-  "homepage": "https://github.com/NunesGustavoo/centra-wsocket#readme",
+  "homepage": "https://github.com/NunesGustavoo/WSocket#readme",
   "bugs": {
-    "url": "https://github.com/NunesGustavoo/centra-wsocket/issues"
+    "url": "https://github.com/NunesGustavoo/WSocket/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NunesGustavoo/centra-wsocket.git"
+    "url": "git+https://github.com/NunesGustavoo/WSocket.git"
   },
   "author": "NunesGustavoo",
   "license": "MIT",

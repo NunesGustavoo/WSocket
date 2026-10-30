@@ -43,7 +43,15 @@ export const PROCESSABLE_HISTORY_TYPES = [
 ]
 
 export const DEFAULT_CONNECTION_CONFIG: SocketConfig = {
-	version: version as WAVersion,
+	version: (() => {
+		if (process.env.WA_VERSION) {
+			const parts = process.env.WA_VERSION.split(',').map(p => parseInt(p.trim(), 10))
+			if (parts.length === 3 && parts.every(n => !isNaN(n))) {
+				return parts as WAVersion
+			}
+		}
+		return version as WAVersion
+	})(),
 	browser: Browsers.ubuntu('Chrome'),
 	waWebSocketUrl: 'wss://web.whatsapp.com/ws/chat',
 	connectTimeoutMs: 20_000,

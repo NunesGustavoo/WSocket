@@ -148,4 +148,8 @@ export type SocketConfig = {
 	cachedGroupMetadata: (jid: string) => Promise<GroupMetadata | undefined>
 
 	makeSignalRepository: (auth: SignalAuthState) => SignalRepository
+	/** configurações para fila anti-ban com rate limiting e jitter */
+	queue?: import('./Helpers').QueueConfig
+	/** configurações para reconexão automática com backoff exponencial */
+	autoReconnect?: import('./Helpers').AutoReconnectConfig
 }

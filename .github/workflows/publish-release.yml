@@ -61,7 +61,7 @@ jobs:
         run: npm pack
 
       - name: Rename Pack
-        run: mv *.tgz centra-wsocket.tgz
+        run: mv *.tgz wsocket.tgz
 
       - name: Create Release
         uses: meeDamian/github-release@2.0
@@ -76,6 +76,6 @@ jobs:
           draft: false
           prerelease: false
           files: >
-            centra-wsocket.tgz
+            wsocket.tgz
           gzip: folders
           allow_override: true

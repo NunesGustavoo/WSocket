@@ -1,3 +1,4 @@
+import { Boom } from '@hapi/boom';
 import { UserFacingSocketConfig } from '../Types';
 declare const makeWASocket: (config: UserFacingSocketConfig) => {
     logger: import("../Utils/logger").ILogger;
@@ -252,12 +253,29 @@ declare const makeWASocket: (config: UserFacingSocketConfig) => {
     sendNode: (frame: import("..").BinaryNode) => Promise<void>;
     logout: (msg?: string) => Promise<void>;
     end: (error: Error | undefined) => void;
-    onUnexpectedError: (err: Error | import("@hapi/boom").Boom, msg: string) => void;
+    onUnexpectedError: (err: Error | Boom, msg: string) => void;
     onSocketEnd: (handler: () => void) => void;
     uploadPreKeys: (count?: number) => Promise<void>;
     uploadPreKeysToServerIfRequired: () => Promise<void>;
     requestPairingCode: (phoneNumber: string, customPairingCode?: string) => Promise<string>;
     waitForConnectionUpdate: (check: (u: Partial<import("../Types").ConnectionState>) => Promise<boolean | undefined>, timeoutMs?: number) => Promise<void>;
     sendWAMBuffer: (wamBuffer: Buffer) => Promise<any>;
+} & {
+    queue: import("..").MessageQueue;
+    configureQueue: (config: Partial<import("../Types").QueueConfig>) => void;
+    sendText: (jid: string, text: string, options?: import("../Types").SendTextOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
+    sendImage: (jid: string, image: import("../Types").WAMediaUpload, options?: import("../Types").SendMediaOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
+    sendVideo: (jid: string, video: import("../Types").WAMediaUpload, options?: import("../Types").SendMediaOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
+    sendVoice: (jid: string, audio: import("../Types").WAMediaUpload, options?: import("../Types").SendVoiceOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
+    sendDocument: (jid: string, document: import("../Types").WAMediaUpload, options?: import("../Types").SendMediaOptions) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
+    react: (key: import("../Types").WAMessageKey, emoji: string) => Promise<import("../Types").WAProto.WebMessageInfo | undefined>;
+    markAsRead: (keys: import("../Types").WAMessageKey | import("../Types").WAMessageKey[]) => Promise<void>;
+    downloadMedia: (msg: import("../Types").WAMessage | import("..").ParsedMessage) => Promise<Buffer>;
+    resolveJid: (phoneOrJid: string) => Promise<string | undefined>;
+    onMessage: (callback: import("./convenience").MessageEvents["message"]) => any;
+    onText: (callback: import("./convenience").MessageEvents["message:text"]) => any;
+    onAudio: (callback: import("./convenience").MessageEvents["message:audio"]) => any;
+    onImage: (callback: import("./convenience").MessageEvents["message:image"]) => any;
+    onInteractive: (callback: import("./convenience").MessageEvents["message:interactive"]) => any;
 };
 export default makeWASocket;

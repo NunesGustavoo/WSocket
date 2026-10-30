@@ -95,7 +95,7 @@ Requer **Node.js ≥ 20**.
 
 ```bash
 # Via repositório Git
-yarn add github:<usuario>/WSocket
+yarn add github:NunesGustavoo/WSocket
 
 # Ou via npm (quando publicado)
 yarn add @whiskeysockets/baileys
@@ -219,45 +219,89 @@ const sock = makeWASocket({ auth: state })
 sock.ev.on('creds.update', saveCreds)
 ```
 
-### Armazenamento em Banco de Dados (SQL ou NoSQL)
-Para produção em larga escala (PostgreSQL, MySQL, Redis, MongoDB), estruture um `AuthenticationState` personalizado contendo:
-* `creds`: Um objeto `AuthenticationCreds` serializado com `BufferJSON.replacer`.
-* `keys`: Uma implementação de `SignalKeyStore` com os métodos `get`, `set` e `clear`.
+### Armazenamento em Banco de Dados (`useDatabaseAuthState`)
+Para produção em larga escala (PostgreSQL, MySQL, Redis, MongoDB), a biblioteca disponibiliza o adaptador genérico `useDatabaseAuthState`. Basta implementar os métodos de chave-valor:
 
-Exemplo conceitual de estrutura de chaves:
 ```typescript
-import { AuthenticationState, BufferJSON, proto } from '@whiskeysockets/baileys'
+import makeWASocket, { useDatabaseAuthState, AuthDbAdapter } from 'wsocket'
 
-async function loadDbAuthState(sessionId: string): Promise<AuthenticationState> {
-    const credsRaw = await db.get(`creds:${sessionId}`)
-    const creds = credsRaw ? JSON.parse(credsRaw, BufferJSON.reviver) : initAuthCreds()
-
-    return {
-        creds,
-        keys: {
-            get: async (type, ids) => {
-                const data: Record<string, any> = {}
-                for (const id of ids) {
-                    const row = await db.get(`keys:${sessionId}:${type}:${id}`)
-                    if (row) data[id] = JSON.parse(row, BufferJSON.reviver)
-                }
-                return data
-            },
-            set: async (data) => {
-                for (const type in data) {
-                    for (const id in data[type]) {
-                        const val = data[type][id]
-                        if (val) {
-                            await db.set(`keys:${sessionId}:${type}:${id}`, JSON.stringify(val, BufferJSON.replacer))
-                        } else {
-                            await db.del(`keys:${sessionId}:${type}:${id}`)
-                        }
-                    }
-                }
-            }
-        }
+// Exemplo de implementação com Redis (ou PostgreSQL / Prisma / TypeORM)
+const redisAdapter: AuthDbAdapter = {
+    get: async (key) => redis.get(key),
+    set: async (key, value) => { await redis.set(key, value) },
+    delete: async (key) => { await redis.del(key) },
+    // Opcional: otimização para leitura e escrita em lote
+    getMany: async (keys) => {
+        const values = await redis.mget(...keys)
+        return keys.reduce((acc, k, idx) => ({ ...acc, [k]: values[idx] }), {})
     }
 }
+
+const { state, saveCreds } = await useDatabaseAuthState(redisAdapter, {
+    prefix: 'sessao-principal' // Isola múltiplas instâncias no mesmo banco
+})
+
+const sock = makeWASocket({ auth: state })
+sock.ev.on('creds.update', saveCreds)
+```
+
+### Fila de Envio com Rate Limiting & Jitter (Anti-Ban)
+A biblioteca inclui controle nativo de taxa de envio para prevenir bloqueios por rajadas de mensagens:
+
+```typescript
+import makeWASocket, { useMultiFileAuthState } from 'wsocket'
+
+const { state, saveCreds } = await useMultiFileAuthState('./session')
+
+const sock = makeWASocket({
+    auth: state,
+    queue: {
+        enabled: true,            // Habilita a fila anti-ban
+        minIntervalMs: 1000,      // Intervalo mínimo de 1s entre mensagens
+        jitterMs: 1500,           // Variação aleatória de até 1.5s
+        autoSimulateTyping: true  // Simula 'composing' antes de textos e 'recording' antes de áudios
+    }
+})
+```
+
+### Helpers Nativos de Alta Produtividade & Decodificação Fácil
+O socket expõe métodos diretos e eventos de alto nível:
+
+```typescript
+// Helpers de envio direto:
+await sock.sendText('5511999999999@s.whatsapp.net', 'Olá!', { quoted: msg })
+await sock.sendVoice('5511999999999@s.whatsapp.net', audioBuffer) // PTT com forma de onda
+await sock.sendImage('5511999999999@s.whatsapp.net', imageBuffer, { caption: 'Foto' })
+await sock.sendVideo('5511999999999@s.whatsapp.net', videoBuffer)
+await sock.sendDocument('5511999999999@s.whatsapp.net', docBuffer, { fileName: 'relatorio.pdf' })
+await sock.react(msg.key, '✅')
+await sock.markAsRead(msg.key)
+
+// Download direto de mídia:
+const mediaBuffer = await sock.downloadMedia(msg)
+
+// Resolução de JID com normalização de números brasileiros (9º dígito):
+const jidValido = await sock.resolveJid('+55 11 98888-7777') // Retorna o JID exato registrado
+
+// Eventos simplificados de alto nível:
+sock.onText(async ({ msg, text, reply }) => {
+    console.log(`Mensagem de ${msg.chatId}: ${text}`)
+    await reply('Recebido!')
+})
+
+sock.onAudio(async ({ msg, isVoiceNote, duration }) => {
+    console.log(`Áudio recebido (${duration}s). É nota de voz: ${isVoiceNote}`)
+})
+
+// Normalizador de mensagens brutas:
+import { parseMessage } from 'wsocket'
+
+sock.ev.on('messages.upsert', ({ messages }) => {
+    for (const raw of messages) {
+        const parsed = parseMessage(raw)
+        // parsed contém: text, mediaType, sender, isGroup, quoted, duration, etc.
+    }
+})
 ```
 
 ### Cache de Chaves Criptográficas (`makeCacheableSignalKeyStore`)
