@@ -25,7 +25,7 @@ jobs:
       - name: Install packages
         run: |
           yarn
-          yarn --pure-lockfile --cwd proto-extract
+          npm ci --prefix proto-extract
 
       - name: Update WAProto.proto
         id: wa_proto_info
